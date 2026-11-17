@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:HealthPulse.ViewModels"
+             xmlns:models="clr-namespace:HealthPulse.Models"
+             x:Class="HealthPulse.Views.MigrainesPage"
+             x:DataType="vm:MigrainesViewModel"
+             Title="Migraines"
+             BackgroundColor="#F3F4F6">
+
+    <CollectionView ItemsSource="{Binding Entries}" SelectionMode="None" Margin="16,0">
+        <CollectionView.Header>
+            <VerticalStackLayout Spacing="12" Padding="0,12,0,8">
+
+                <Border Style="{StaticResource Card}" IsVisible="{Binding HasOngoing}"
+                        BackgroundColor="#FEF3C7" Stroke="#F59E0B">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Migraine in progress" Style="{StaticResource CardTitle}" />
+                        <Label Text="{Binding OngoingText}" FontSize="14" TextColor="#374151" />
+                        <Button Text="💊  Took triptan now" Style="{StaticResource SecondaryButton}"
+                                Command="{Binding TriptanNowCommand}"
+                                IsVisible="{Binding OngoingNeedsTriptan}" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button Text="It's over" Style="{StaticResource PrimaryButton}"
+                                    Command="{Binding EndOngoingCommand}" />
+                            <Button Grid.Column="1" Text="Edit details" Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding OpenCommand}" CommandParameter="{Binding Ongoing}" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Button Text="➕  Log a migraine" Style="{StaticResource PrimaryButton}"
+                        Command="{Binding LogNewCommand}" IsVisible="{Binding NoOngoing}" />
+
+                <Label Text="{Binding StatsText}" Style="{StaticResource Muted}" />
+                <Label Text="History" Style="{StaticResource CardTitle}" IsVisible="{Binding HasEntries}" />
+                <Label Text="No migraines logged yet. Tap “Log a migraine” when one starts; you can fill in the end time and details later."
+                       Style="{StaticResource Muted}" IsVisible="{Binding NoEntries}" />
+            </VerticalStackLayout>
+        </CollectionView.Header>
+
+        <CollectionView.ItemTemplate>
+            <DataTemplate x:DataType="models:MigraineEntry">
+                <Border Style="{StaticResource Card}" Padding="14,12" Margin="0,0,0,10">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:MigrainesViewModel}}, Path=OpenCommand, x:DataType=vm:MigrainesViewModel}"
+                                              CommandParameter="{Binding .}" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="{Binding DisplayStart}" FontSize="15" FontAttributes="Bold" TextColor="#0F766E" />
+                        <Label Text="{Binding Summary}" FontSize="14" TextColor="#374151" />
+                        <Label Text="{Binding TriggerSummary, StringFormat='Triggers: {0}'}" Style="{StaticResource Muted}"
+                               IsVisible="{Binding HasTriggers}" />
+                    </VerticalStackLayout>
+                </Border>
+            </DataTemplate>
+        </CollectionView.ItemTemplate>
+    </CollectionView>
+</ContentPage>
