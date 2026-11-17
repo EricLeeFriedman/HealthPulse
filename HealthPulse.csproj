@@ -37,6 +37,8 @@
 		<PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.android" Version="2.1.13" />
 		<PackageReference Include="Xamarin.AndroidX.Health.Connect.ConnectClient" Version="1.1.0.4" />
 		<PackageReference Include="Xamarin.GooglePlayServices.Auth" Version="122.0.0" />
+		<!-- Play Services pulls Fragment 1.9, which absorbed FragmentKt; MAUI's older Fragment.Ktx would duplicate it. -->
+		<PackageReference Include="Xamarin.AndroidX.Fragment.Ktx" Version="1.9.0" />
 		<!-- Health Connect pulls newer AndroidX than MAUI does; lift MAUI's copies to match. -->
 		<PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" Version="2.11.0.1" />
 		<PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core" Version="2.11.0.1" />
