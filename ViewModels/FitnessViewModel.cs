@@ -9,12 +9,56 @@ namespace HealthPulse.ViewModels;
 public partial class FitnessViewModel : ObservableObject
 {
     public ITrackerStore Store;
+    public IHealthDataService HealthData;
     public ErrorLog Errors;
+    DateTime lastSync = DateTime.MinValue;
 
-    public FitnessViewModel(ITrackerStore store, ErrorLog errors)
+    public FitnessViewModel(ITrackerStore store, IHealthDataService healthData, ErrorLog errors)
     {
         Store = store;
+        HealthData = healthData;
         Errors = errors;
+    }
+
+    [ObservableProperty] public partial string SyncText { get; set; } = "";
+    [ObservableProperty] public partial bool IsSyncing { get; set; }
+
+    /// <summary>Imports the last two weeks of watch workouts from Health Connect.</summary>
+    public async Task SyncAsync(bool force = false)
+    {
+        if (IsSyncing || (!force && DateTime.Now - lastSync < TimeSpan.FromMinutes(5))) return;
+        IsSyncing = true;
+        try
+        {
+            if (HealthData.GetAvailability() != HealthDataAvailability.Available || !await HealthData.HasPermissionsAsync())
+            {
+                SyncText = "Connect Health Connect on the Health tab so workouts from your watch show up here automatically.";
+                return;
+            }
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var days = await HealthData.GetDailySummariesAsync(today.AddDays(-13), today);
+            var added = await WorkoutImporter.ImportAsync(Store, days.SelectMany(d => d.Exercise));
+            lastSync = DateTime.Now;
+            SyncText = added > 0
+                ? $"Added {added} workout{(added == 1 ? "" : "s")} from your watch. Tap one to add sets and weights (optional)."
+                : $"Workouts from your watch sync automatically. Last checked {DateTime.Now:h:mm tt}.";
+        }
+        catch (Exception exception)
+        {
+            Errors.Record("Syncing watch workouts", exception);
+            SyncText = $"Couldn't read workouts from Health Connect: {exception.Message}";
+        }
+        finally
+        {
+            IsSyncing = false;
+        }
+    }
+
+    [RelayCommand]
+    async Task SyncNowAsync()
+    {
+        await SyncAsync(force: true);
+        await LoadAsync();
     }
 
     [ObservableProperty] public partial string WeekText { get; set; } = "";

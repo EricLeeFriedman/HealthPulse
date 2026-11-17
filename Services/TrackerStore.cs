@@ -12,7 +12,10 @@ public interface ITrackerStore
     Task<List<DailyCheckIn>> GetCheckInsAsync(DateOnly from, DateOnly to);
     Task SaveCheckInAsync(DailyCheckIn checkIn);
 
+    /// <summary>Workouts in the range, without ones the user deleted.</summary>
     Task<List<WorkoutSession>> GetWorkoutsAsync(DateOnly from, DateOnly to);
+    /// <summary>Workouts in the range including deleted (hidden) detected ones, for importing.</summary>
+    Task<List<WorkoutSession>> GetAllWorkoutsAsync(DateOnly from, DateOnly to);
     Task<WorkoutSession?> GetWorkoutAsync(string id);
     Task SaveWorkoutAsync(WorkoutSession session);
     Task DeleteWorkoutAsync(string id);
@@ -96,7 +99,10 @@ public class LocalTrackerStore : ITrackerStore
         await Database.InsertOrReplaceAsync(checkIn);
     }
 
-    public async Task<List<WorkoutSession>> GetWorkoutsAsync(DateOnly from, DateOnly to)
+    public async Task<List<WorkoutSession>> GetWorkoutsAsync(DateOnly from, DateOnly to) =>
+        (await GetAllWorkoutsAsync(from, to)).Where(s => !s.Hidden).ToList();
+
+    public async Task<List<WorkoutSession>> GetAllWorkoutsAsync(DateOnly from, DateOnly to)
     {
         await InitAsync();
         var start = Start(from);
@@ -144,10 +150,21 @@ public class LocalTrackerStore : ITrackerStore
     public async Task DeleteWorkoutAsync(string id)
     {
         await InitAsync();
+        var session = await Database.Table<WorkoutSession>().Where(s => s.Id == id).FirstOrDefaultAsync();
         await Database.RunInTransactionAsync(connection =>
         {
             connection.Execute("DELETE FROM WorkoutSet WHERE SessionId = ?", id);
-            connection.Delete<WorkoutSession>(id);
+            if (session?.ExternalId != null)
+            {
+                // Keep detected workouts as hidden so the next Health Connect sync doesn't bring them back.
+                session.Hidden = true;
+                session.UpdatedAt = DateTime.UtcNow;
+                connection.Update(session);
+            }
+            else
+            {
+                connection.Delete<WorkoutSession>(id);
+            }
         });
     }
 

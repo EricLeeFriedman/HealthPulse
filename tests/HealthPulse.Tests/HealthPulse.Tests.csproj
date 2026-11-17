@@ -32,6 +32,7 @@
     <Compile Include="..\..\Services\TrackerStore.cs" Link="App\TrackerStore.cs" />
     <Compile Include="..\..\Services\WeatherService.cs" Link="App\WeatherService.cs" />
     <Compile Include="..\..\Services\WorkoutForm.cs" Link="App\WorkoutForm.cs" />
+    <Compile Include="..\..\Services\WorkoutImporter.cs" Link="App\WorkoutImporter.cs" />
   </ItemGroup>
 
   <ItemGroup>

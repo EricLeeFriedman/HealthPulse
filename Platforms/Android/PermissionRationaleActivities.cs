@@ -14,7 +14,7 @@ public abstract class PrivacyExplanationActivity : Activity
 {
     public const string Explanation =
         "HealthPulse reads your sleep, steps, heart rate, resting heart rate, heart rate variability, " +
-        "exercise sessions, and weight from Health Connect.\n\n" +
+        "exercise sessions, distance and weight from Health Connect.\n\n" +
         "It uses them only to show you daily summaries next to your migraine log, and to write an export " +
         "file to your own Google Drive (My Drive/HealthPulse). Nothing is sent anywhere else.";
 

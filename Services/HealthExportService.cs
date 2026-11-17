@@ -108,6 +108,9 @@ public class HealthExportService
         {
             try
             {
+                // Workouts recorded on the watch count toward the plan without manual entry.
+                await WorkoutImporter.ImportAsync(Trackers, health.SelectMany(h => h.Exercise));
+
                 trackers = new TrackerExport(
                     await Trackers.GetCheckInsAsync(from, today),
                     await Trackers.GetWorkoutsAsync(from, today),
@@ -264,6 +267,10 @@ public class HealthExportService
                 id = x.Id,
                 start = x.Date,
                 type = x.SessionType,
+                source = x.IsDetected ? "watch" : "manual",
+                watchExerciseType = x.ExerciseType,
+                avgHeartRate = x.AvgHeartRate,
+                maxHeartRate = x.MaxHeartRate,
                 weekInBlock = WorkoutPlan.WeekInBlock(DateOnly.FromDateTime(x.Date)),
                 durationMinutes = x.DurationMinutes,
                 distanceMiles = x.DistanceMiles,
