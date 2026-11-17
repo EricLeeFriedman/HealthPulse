@@ -11,20 +11,29 @@ public partial class HealthViewModel : ObservableObject
     public IHealthDataService HealthData;
     public IExportDestination Destination;
     public HealthExportService Exporter;
+    public ErrorLog Errors;
 
-    public HealthViewModel(IHealthDataService healthData, IExportDestination destination, HealthExportService exporter)
+    public HealthViewModel(IHealthDataService healthData, IExportDestination destination,
+        HealthExportService exporter, ErrorLog errors)
     {
         HealthData = healthData;
         Destination = destination;
         Exporter = exporter;
+        Errors = errors;
     }
 
     [ObservableProperty] public partial string ConnectionStatus { get; set; } = "";
     [ObservableProperty] public partial bool CanConnect { get; set; }
     [ObservableProperty] public partial string ExportStatus { get; set; } = "";
-    [ObservableProperty] public partial string ExportFileText { get; set; } = "";
+    [ObservableProperty] public partial string DriveText { get; set; } = "";
+    [ObservableProperty] public partial bool IsSignedIn { get; set; }
     [ObservableProperty] public partial bool IsBusy { get; set; }
+    [ObservableProperty] public partial string ErrorText { get; set; } = "";
+    [ObservableProperty] public partial bool HasErrors { get; set; }
     [ObservableProperty] public partial ObservableCollection<DailyHealthSummary> Days { get; set; } = [];
+
+    public bool IsSignedOut => !IsSignedIn;
+    partial void OnIsSignedInChanged(bool value) => OnPropertyChanged(nameof(IsSignedOut));
 
     public async Task LoadAsync()
     {
@@ -32,8 +41,8 @@ public partial class HealthViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            await RefreshConnectionAsync();
             RefreshExportStatus();
+            await RefreshConnectionAsync();
             if (!CanConnect && HealthData.GetAvailability() == HealthDataAvailability.Available)
             {
                 var today = DateOnly.FromDateTime(DateTime.Today);
@@ -43,11 +52,13 @@ public partial class HealthViewModel : ObservableObject
         }
         catch (Exception exception)
         {
+            Errors.Record("Loading health data", exception);
             ConnectionStatus = $"Couldn't read Health Connect: {exception.Message}";
         }
         finally
         {
             IsBusy = false;
+            RefreshErrors();
         }
     }
 
@@ -68,41 +79,89 @@ public partial class HealthViewModel : ObservableObject
         var granted = await HealthData.HasPermissionsAsync();
         CanConnect = !granted;
         ConnectionStatus = granted
-            ? "Connected to Health Connect. Fitbit / Pixel Watch / Google Fit data shows up here once it syncs."
-            : "Not connected yet. Tap Connect and allow all the health data types.";
+            ? "Connected. Pixel Watch data arrives once the Fitbit app syncs it to Health Connect."
+            : "Not connected yet. Tap Connect and allow all the data types, including \"access data in the background\" for the nightly export.";
     }
 
     void RefreshExportStatus()
     {
-        ExportFileText = Destination.HasDestination
-            ? $"Export file: {Destination.DestinationName ?? HealthExportService.FileName}"
-            : "No export file chosen yet. Choose one and pick Drive in the file picker.";
+        IsSignedIn = Destination.HasDestination;
+        DriveText = IsSignedIn
+            ? $"Exports to {Destination.DestinationName}"
+            : $"Sign in with Google to export to {DriveExportDestination.DrivePath}.";
         var last = Exporter.LastExportUtc;
-        ExportStatus = Exporter.LastError is { } error
-            ? $"Last export failed: {error}"
-            : last.HasValue
-                ? $"Last exported {last.Value.ToLocalTime():MMM d, h:mm tt}. Updates when you open the app (every 3 h) and after each migraine change."
-                : "Not exported yet.";
+        var next = NightlySchedule.NextRun(DateTime.Now, NightlySchedule.ExportTime);
+        ExportStatus = (Exporter.LastError is { } error
+                ? $"Last export failed: {error}"
+                : last.HasValue ? $"Last exported {last.Value.ToLocalTime():ddd MMM d, h:mm tt}." : "Not exported yet.")
+            + $" Next nightly export: {next:ddd h:mm tt}. It also updates when you open the app and after each migraine change.";
+    }
+
+    void RefreshErrors()
+    {
+        var entries = Errors.Entries;
+        HasErrors = entries.Count > 0;
+        ErrorText = string.Join("\n\n", entries.Take(3));
+    }
+
+    async Task RunAsync(string what, Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (OperationCanceledException)
+        {
+            // User backed out of a system screen.
+        }
+        catch (Exception exception)
+        {
+            Errors.Record(what, exception);
+            await Shell.Current.DisplayAlertAsync($"{what} failed", exception.Message, "OK");
+        }
+        finally
+        {
+            RefreshExportStatus();
+            RefreshErrors();
+        }
     }
 
     [RelayCommand]
-    async Task ConnectAsync()
+    Task ConnectAsync() => RunAsync("Connecting Health Connect", async () =>
     {
         await HealthData.RequestPermissionsAsync();
         await LoadAsync();
         _ = Exporter.ExportIfDueAsync(force: true);
-    }
+    });
 
     [RelayCommand]
-    async Task ChooseExportFileAsync()
+    Task SignInAsync() => RunAsync("Google sign-in", async () =>
     {
-        if (await Destination.ChooseDestinationAsync(HealthExportService.FileName))
-            await ExportNowAsync();
-        RefreshExportStatus();
-    }
+        IsBusy = true;
+        try
+        {
+            if (await Destination.ChooseDestinationAsync(HealthExportService.FileName))
+            {
+                var error = await Exporter.ExportNowAsync();
+                if (error != null)
+                    await Shell.Current.DisplayAlertAsync("Export failed", error, "OK");
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    });
 
     [RelayCommand]
-    async Task ExportNowAsync()
+    Task SignOutAsync() => RunAsync("Signing out", () =>
+    {
+        Destination.Disconnect();
+        return Task.CompletedTask;
+    });
+
+    [RelayCommand]
+    Task ExportNowAsync() => RunAsync("Export", async () =>
     {
         IsBusy = true;
         try
@@ -114,20 +173,26 @@ public partial class HealthViewModel : ObservableObject
         finally
         {
             IsBusy = false;
-            RefreshExportStatus();
         }
-    }
+    });
 
     [RelayCommand]
-    async Task ShareExportAsync()
+    Task ShareExportAsync() => RunAsync("Sharing export", async () =>
     {
         var json = await Exporter.BuildJsonAsync(DateOnly.FromDateTime(DateTime.Today));
         var path = Path.Combine(FileSystem.CacheDirectory, HealthExportService.FileName);
         await File.WriteAllTextAsync(path, json);
         await Share.Default.RequestAsync(new ShareFileRequest
         {
-            Title = "Migraine + health export",
+            Title = "HealthPulse export",
             File = new ShareFile(path)
         });
+    });
+
+    [RelayCommand]
+    void ClearErrors()
+    {
+        Errors.Clear();
+        RefreshErrors();
     }
 }

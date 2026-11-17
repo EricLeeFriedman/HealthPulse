@@ -20,6 +20,11 @@
     <Compile Include="..\..\Services\HealthSummaryBuilder.cs" Link="App\HealthSummaryBuilder.cs" />
     <Compile Include="..\..\Services\MigraineStats.cs" Link="App\MigraineStats.cs" />
     <Compile Include="..\..\Services\MigraineForm.cs" Link="App\MigraineForm.cs" />
+    <Compile Include="..\..\Services\IGoogleAuth.cs" Link="App\IGoogleAuth.cs" />
+    <Compile Include="..\..\Services\GoogleDriveClient.cs" Link="App\GoogleDriveClient.cs" />
+    <Compile Include="..\..\Services\DriveExportDestination.cs" Link="App\DriveExportDestination.cs" />
+    <Compile Include="..\..\Services\NightlySchedule.cs" Link="App\NightlySchedule.cs" />
+    <Compile Include="..\..\Services\ErrorLog.cs" Link="App\ErrorLog.cs" />
   </ItemGroup>
 
   <ItemGroup>

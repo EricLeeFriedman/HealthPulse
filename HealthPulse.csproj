@@ -36,6 +36,7 @@
 		<PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
 		<PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.android" Version="2.1.13" />
 		<PackageReference Include="Xamarin.AndroidX.Health.Connect.ConnectClient" Version="1.1.0.4" />
+		<PackageReference Include="Xamarin.GooglePlayServices.Auth" Version="122.0.0.1" />
 		<!-- Health Connect pulls newer AndroidX than MAUI does; lift MAUI's copies to match. -->
 		<PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" Version="2.11.0.1" />
 		<PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core" Version="2.11.0.1" />

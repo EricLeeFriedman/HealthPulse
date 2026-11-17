@@ -26,6 +26,11 @@ public class HealthExportService
     public ILogger<HealthExportService> Logger;
     public SemaphoreSlim ExportLock = new(1, 1);
 
+    /// <summary>Recent app errors to include in the export, so problems are visible remotely.</summary>
+    public Func<IReadOnlyList<string>>? RecentErrors { get; set; }
+
+    public Action<Exception>? ExportFailed { get; set; }
+
     public HealthExportService(
         IHealthDataService healthData,
         IMigraineService migraines,
@@ -83,7 +88,8 @@ public class HealthExportService
         }
 
         var migraines = await Migraines.GetEntriesForRangeAsync(from, today);
-        return BuildJson(DateTime.UtcNow, TimeZoneInfo.Local.Id, from, today, health, migraines, healthError);
+        return BuildJson(DateTime.UtcNow, TimeZoneInfo.Local.Id, from, today, health, migraines, healthError,
+            RecentErrors?.Invoke());
     }
 
     public static string BuildJson(
@@ -93,7 +99,8 @@ public class HealthExportService
         DateOnly to,
         IEnumerable<DailyHealthSummary> health,
         IEnumerable<MigraineEntry> migraines,
-        string? healthError = null)
+        string? healthError = null,
+        IReadOnlyList<string>? appErrors = null)
     {
         var healthByDate = health.ToDictionary(h => h.Date);
         var migraineList = migraines.OrderBy(m => m.StartTime).ToList();
@@ -140,6 +147,7 @@ public class HealthExportService
             from = from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             to = to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             healthConnectError = healthError,
+            appErrors = appErrors is { Count: > 0 } ? appErrors : null,
             notes = "Times are local. sleepHours sums sleep sessions that ended on that date (the night before it). Heart rate values are beats per minute.",
             days,
             migraines = migraineList.Select(m => new
@@ -189,6 +197,7 @@ public class HealthExportService
         {
             Logger.LogError(exception, "Export failed");
             Settings.SetString(LastErrorKey, exception.Message);
+            ExportFailed?.Invoke(exception);
             return exception.Message;
         }
         finally
