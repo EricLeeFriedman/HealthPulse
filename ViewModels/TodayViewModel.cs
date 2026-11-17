@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -70,6 +71,12 @@ public partial class TodayViewModel : ObservableObject
         }
     }
 
+    [ObservableProperty] public partial ObservableCollection<FoodEntry> Meals { get; set; } = [];
+    [ObservableProperty] public partial string NewFoodText { get; set; } = "";
+    [ObservableProperty] public partial TimeSpan NewFoodTime { get; set; } = DateTime.Now.TimeOfDay;
+    [ObservableProperty] public partial string NewFoodProtein { get; set; } = "";
+    [ObservableProperty] public partial string MealsSummary { get; set; } = "";
+
     [ObservableProperty] public partial bool MobilityDone { get; set; }
     [ObservableProperty] public partial string MobilityLabel { get; set; } = "Mobility routine done";
     [ObservableProperty] public partial string Notes { get; set; } = "";
@@ -112,6 +119,9 @@ public partial class TodayViewModel : ObservableObject
             SavedText = c.UpdatedAt == DateTime.MinValue
                 ? "Not checked in yet"
                 : $"Saved {DateTime.SpecifyKind(c.UpdatedAt, DateTimeKind.Utc).ToLocalTime():h:mm tt}";
+
+            await LoadMealsAsync(day);
+            NewFoodTime = new TimeSpan(DateTime.Now.Hour, DateTime.Now.Minute, 0);
 
             await RefreshWeatherTextAsync(day);
         }
@@ -175,28 +185,78 @@ public partial class TodayViewModel : ObservableObject
         FirstMealTime = new TimeSpan(DateTime.Now.Hour, DateTime.Now.Minute, 0);
     }
 
-    [RelayCommand]
-    Task SaveAsync() => UiActions.RunAsync(Errors, "Saving check-in", async () =>
+    async Task LoadMealsAsync(DateOnly day)
     {
-        var checkIn = new DailyCheckIn
-        {
-            Date = DailyCheckIn.Key(DateOnly.FromDateTime(Date)),
-            CaffeineCups = (int)CaffeineCups,
-            LastCaffeineTime = HasLastCaffeine ? LastCaffeineTime : null,
-            WaterGlasses = (int)WaterGlasses,
-            FirstMealTime = HasFirstMeal ? FirstMealTime : null,
-            AlcoholDrinks = (int)AlcoholDrinks,
-            Stress = StressIndex > 0 ? StressIndex : null,
-            Riboflavin = Riboflavin,
-            BComplex = BComplex,
-            CoQ10 = CoQ10,
-            Magnesium = Magnesium,
-            ProteinGrams = TrackerRules.ParseInt(ProteinGrams, "Protein"),
-            MobilityDone = MobilityDone,
-            Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(),
-        };
+        var meals = await Store.GetFoodAsync(day, day);
+        Meals = new ObservableCollection<FoodEntry>(meals);
+        var protein = FoodLog.ProteinTotal(meals);
+        MealsSummary = meals.Count == 0
+            ? "Nothing logged yet. Write what you ate with rough portions, e.g. \"3 eggs, 1 slice toast, latte\"."
+            : $"{meals.Count} entr{(meals.Count == 1 ? "y" : "ies")}" + (protein.HasValue ? $", about {protein} g protein" : "") + ". Tap one to delete it.";
+    }
+
+    DailyCheckIn BuildCheckIn() => new()
+    {
+        Date = DailyCheckIn.Key(DateOnly.FromDateTime(Date)),
+        CaffeineCups = (int)CaffeineCups,
+        LastCaffeineTime = HasLastCaffeine ? LastCaffeineTime : null,
+        WaterGlasses = (int)WaterGlasses,
+        FirstMealTime = HasFirstMeal ? FirstMealTime : null,
+        AlcoholDrinks = (int)AlcoholDrinks,
+        Stress = StressIndex > 0 ? StressIndex : null,
+        Riboflavin = Riboflavin,
+        BComplex = BComplex,
+        CoQ10 = CoQ10,
+        Magnesium = Magnesium,
+        ProteinGrams = TrackerRules.ParseInt(ProteinGrams, "Protein"),
+        MobilityDone = MobilityDone,
+        Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(),
+    };
+
+    async Task SaveCheckInAsync(DailyCheckIn checkIn)
+    {
         await Store.SaveCheckInAsync(checkIn);
         SavedText = $"Saved {DateTime.Now:h:mm tt}";
         _ = Exporter.ExportIfDueAsync();
+    }
+
+    /// <summary>Meals fill in the day's protein total and first meal time, then the check-in is saved.</summary>
+    async Task ApplyMealsAsync()
+    {
+        var checkIn = BuildCheckIn();
+        FoodLog.ApplyTo(checkIn, Meals);
+        ProteinGrams = checkIn.ProteinGrams?.ToString(CultureInfo.CurrentCulture) ?? "";
+        HasFirstMeal = checkIn.FirstMealTime.HasValue;
+        if (checkIn.FirstMealTime is { } first) FirstMealTime = first;
+        await SaveCheckInAsync(checkIn);
+    }
+
+    [RelayCommand]
+    Task AddFoodAsync() => UiActions.RunAsync(Errors, "Saving food", async () =>
+    {
+        var entry = new FoodEntry
+        {
+            Time = Date.Date + NewFoodTime,
+            Text = NewFoodText,
+            ProteinGrams = TrackerRules.ParseInt(NewFoodProtein, "Protein"),
+        };
+        await Store.SaveFoodAsync(entry);
+        NewFoodText = "";
+        NewFoodProtein = "";
+        await LoadMealsAsync(DateOnly.FromDateTime(Date));
+        await ApplyMealsAsync();
     });
+
+    [RelayCommand]
+    Task DeleteFoodAsync(FoodEntry? entry) => UiActions.RunAsync(Errors, "Deleting food", async () =>
+    {
+        if (entry == null) return;
+        if (!await Shell.Current.DisplayAlertAsync("Delete entry?", entry.Text, "Delete", "Cancel")) return;
+        await Store.DeleteFoodAsync(entry.Id);
+        await LoadMealsAsync(DateOnly.FromDateTime(Date));
+        await ApplyMealsAsync();
+    });
+
+    [RelayCommand]
+    Task SaveAsync() => UiActions.RunAsync(Errors, "Saving check-in", () => SaveCheckInAsync(BuildCheckIn()));
 }

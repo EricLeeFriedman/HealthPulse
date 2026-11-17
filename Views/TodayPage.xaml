@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:HealthPulse.ViewModels"
+             xmlns:models="clr-namespace:HealthPulse.Models"
              x:Class="HealthPulse.Views.TodayPage"
              x:DataType="vm:TodayViewModel"
              Title="Today"
@@ -43,11 +44,38 @@
                     </Grid>
                     <Button Text="🍳  Ate my first meal just now" Style="{StaticResource SecondaryButton}" Command="{Binding MealNowCommand}" />
 
-                    <Label Text="Protein estimate (grams)" Style="{StaticResource Muted}" Margin="0,6,0,0" />
+                    <Label Text="Protein for the day (grams). Filled in from the food log when meals have estimates." Style="{StaticResource Muted}" Margin="0,6,0,0" />
                     <Grid ColumnDefinitions="100,*" ColumnSpacing="10">
                         <Entry Text="{Binding ProteinGrams}" Keyboard="Numeric" Placeholder="e.g. 130" />
                         <Label Grid.Column="1" Text="{Binding ProteinStatusText}" VerticalOptions="Center" Style="{StaticResource Muted}" />
                     </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Food log" Style="{StaticResource CardTitle}" />
+                    <Editor Text="{Binding NewFoodText}" Placeholder="What did you eat? e.g. 3 eggs, 1 slice toast, big latte" AutoSize="TextChanges" MaxLength="500" />
+                    <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="8">
+                        <TimePicker Time="{Binding NewFoodTime}" />
+                        <Entry Grid.Column="1" Text="{Binding NewFoodProtein}" Keyboard="Numeric" Placeholder="Protein g (optional)" />
+                        <Button Grid.Column="2" Text="Add" Style="{StaticResource PrimaryButton}" Command="{Binding AddFoodCommand}" />
+                    </Grid>
+                    <Label Text="{Binding MealsSummary}" Style="{StaticResource Muted}" />
+                    <VerticalStackLayout Spacing="6" BindableLayout.ItemsSource="{Binding Meals}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:FoodEntry">
+                                <Grid ColumnDefinitions="70,*" ColumnSpacing="8">
+                                    <Grid.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:TodayViewModel}}, Path=DeleteFoodCommand, x:DataType=vm:TodayViewModel}"
+                                                              CommandParameter="{Binding .}" />
+                                    </Grid.GestureRecognizers>
+                                    <Label Text="{Binding DisplayTime}" FontAttributes="Bold" TextColor="#0F766E" />
+                                    <Label Grid.Column="1" Text="{Binding Display}" TextColor="#374151" />
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
                 </VerticalStackLayout>
             </Border>
 

@@ -18,7 +18,7 @@ HealthPulse ("the app") is a personal, open-source Android app for logging migra
 
 **Migraine log you enter.** Start and end times, pain level, symptoms, medications (such as triptans), possible triggers, and notes. These are stored in a database on your phone.
 
-**Daily check-in, workouts and measurements you enter.** Caffeine, water, meal times, alcohol, stress, supplements, protein estimates, mobility, workouts (sets, reps, weights), waist, weight and fitness test results. These are stored on your phone and included in your Drive export.
+**Daily check-in, workouts and measurements you enter.** Caffeine, water, meal times, free-text food entries, alcohol, stress, supplements, protein estimates, mobility, workouts (sets, reps, weights), waist, weight and fitness test results. These are stored on your phone and included in your Drive export.
 
 **Progress photos.** If you add progress photos, they are copied into the app's private storage on your phone. They are never uploaded or included in the export; the export only says how many photos were taken on a date. Taking a photo in the app uses the camera permission.
 

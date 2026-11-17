@@ -116,7 +116,8 @@ public class HealthExportService
                     await Trackers.GetWorkoutsAsync(from, today),
                     await Trackers.GetMeasurementsAsync(from, today),
                     await Trackers.GetFitnessTestsAsync(from, today),
-                    await Trackers.GetWeatherAsync(from, today));
+                    await Trackers.GetWeatherAsync(from, today),
+                    await Trackers.GetFoodAsync(from, today));
             }
             catch (Exception exception)
             {
@@ -152,6 +153,7 @@ public class HealthExportService
         var workouts = trackers.Workouts.OrderBy(w => w.Date).ToList();
         var measurements = trackers.Measurements.OrderBy(m => m.Date).ToList();
         var tests = trackers.FitnessTests.OrderBy(t => t.Date).ToList();
+        var food = (trackers.Food ?? []).OrderBy(f => f.Time).ToList();
 
         var days = new List<object>();
         for (var date = from; date <= to; date = date.AddDays(1))
@@ -168,6 +170,7 @@ public class HealthExportService
             weather.TryGetValue(key, out var w);
             var dayWorkouts = workouts.Where(x => DateOnly.FromDateTime(x.Date) == date).ToList();
             var dayMeasurement = measurements.LastOrDefault(m => DateOnly.FromDateTime(m.Date) == date);
+            var dayFood = food.Where(f => DateOnly.FromDateTime(f.Time) == date).ToList();
 
             days.Add(new
             {
@@ -210,6 +213,15 @@ public class HealthExportService
                     mobilityDone = c.MobilityDone,
                     notes = c.Notes,
                 },
+                meals = dayFood.Count > 0
+                    ? dayFood.Select(f => new
+                    {
+                        time = f.Time.ToString("HH:mm", CultureInfo.InvariantCulture),
+                        text = f.Text,
+                        proteinGrams = f.ProteinGrams,
+                    })
+                    : null,
+                mealProteinGrams = FoodLog.ProteinTotal(dayFood),
                 weather = w == null ? null : new
                 {
                     pressureMeanHpa = w.PressureMeanHpa,
@@ -234,7 +246,7 @@ public class HealthExportService
             healthConnectError = healthError,
             weatherError,
             appErrors = appErrors is { Count: > 0 } ? appErrors : null,
-            notes = "Times are local. sleepHours sums sleep sessions that ended on that date (the night before it). Heart rate values are beats per minute. Pressure is sea-level hPa from Open-Meteo for the phone's coarse location; pressureMaxDrop6hHpa is the biggest 6-hour fall ending that day. Progress photos stay on the phone and are only counted here.",
+            notes = "Times are local. sleepHours sums sleep sessions that ended on that date (the night before it). Heart rate values are beats per minute. Pressure is sea-level hPa from Open-Meteo for the phone's coarse location; pressureMaxDrop6hHpa is the biggest 6-hour fall ending that day. Progress photos stay on the phone and are only counted here. meals are free-text food entries with rough portions; proteinGrams on a meal is the user's own estimate.",
             plan = new
             {
                 start = WorkoutPlan.PlanStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
@@ -372,7 +384,8 @@ public record TrackerExport(
     List<WorkoutSession> Workouts,
     List<BodyMeasurement> Measurements,
     List<FitnessTest> FitnessTests,
-    List<WeatherDay> Weather)
+    List<WeatherDay> Weather,
+    List<FoodEntry>? Food = null)
 {
     public static TrackerExport Empty => new([], [], [], [], []);
 }

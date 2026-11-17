@@ -30,6 +30,10 @@ public interface ITrackerStore
 
     Task<List<WeatherDay>> GetWeatherAsync(DateOnly from, DateOnly to);
     Task SaveWeatherAsync(IEnumerable<WeatherDay> days);
+
+    Task<List<FoodEntry>> GetFoodAsync(DateOnly from, DateOnly to);
+    Task SaveFoodAsync(FoodEntry entry);
+    Task DeleteFoodAsync(string id);
 }
 
 public class LocalTrackerStore : ITrackerStore
@@ -60,6 +64,7 @@ public class LocalTrackerStore : ITrackerStore
             await Database.CreateTableAsync<BodyMeasurement>();
             await Database.CreateTableAsync<FitnessTest>();
             await Database.CreateTableAsync<WeatherDay>();
+            await Database.CreateTableAsync<FoodEntry>();
             initialized = true;
         }
         finally
@@ -233,5 +238,29 @@ public class LocalTrackerStore : ITrackerStore
         {
             foreach (var day in list) connection.InsertOrReplace(day);
         });
+    }
+
+    public async Task<List<FoodEntry>> GetFoodAsync(DateOnly from, DateOnly to)
+    {
+        await InitAsync();
+        var start = Start(from);
+        var end = End(to);
+        var list = await Database.Table<FoodEntry>().Where(f => f.Time >= start && f.Time < end).ToListAsync();
+        return list.OrderBy(f => f.Time).ToList();
+    }
+
+    public async Task SaveFoodAsync(FoodEntry entry)
+    {
+        await InitAsync();
+        FoodLog.Validate(entry);
+        entry.Text = entry.Text.Trim();
+        entry.UpdatedAt = DateTime.UtcNow;
+        await Database.InsertOrReplaceAsync(entry);
+    }
+
+    public async Task DeleteFoodAsync(string id)
+    {
+        await InitAsync();
+        await Database.DeleteAsync<FoodEntry>(id);
     }
 }
