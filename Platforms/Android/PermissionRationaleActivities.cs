@@ -22,9 +22,9 @@ public abstract class PrivacyExplanationActivity : Activity
     {
         base.OnCreate(savedInstanceState);
         var padding = (int)(24 * (Resources?.DisplayMetrics?.Density ?? 1));
-        var text = new TextView(this) { Text = Explanation, TextSize = 17 };
+        var text = new global::Android.Widget.TextView(this) { Text = Explanation, TextSize = 17 };
         text.SetPadding(padding, padding, padding, padding);
-        var scroll = new ScrollView(this);
+        var scroll = new global::Android.Widget.ScrollView(this);
         scroll.AddView(text);
         SetContentView(scroll);
     }
