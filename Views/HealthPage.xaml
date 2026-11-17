@@ -22,17 +22,30 @@
 
                 <Border Style="{StaticResource Card}">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="Export to Google Drive" Style="{StaticResource CardTitle}" />
-                        <Label Text="{Binding ExportFileText}" FontSize="14" TextColor="#374151" />
+                        <Label Text="Google Drive export" Style="{StaticResource CardTitle}" />
+                        <Label Text="{Binding DriveText}" FontSize="14" TextColor="#374151" />
                         <Label Text="{Binding ExportStatus}" Style="{StaticResource Muted}" />
-                        <Button Text="Choose export file" Style="{StaticResource SecondaryButton}"
-                                Command="{Binding ChooseExportFileCommand}" />
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <Button Text="Sign in with Google" Style="{StaticResource PrimaryButton}"
+                                Command="{Binding SignInCommand}" IsVisible="{Binding IsSignedOut}" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10" IsVisible="{Binding IsSignedIn}">
                             <Button Text="Export now" Style="{StaticResource PrimaryButton}"
                                     Command="{Binding ExportNowCommand}" />
                             <Button Grid.Column="1" Text="Share…" Style="{StaticResource SecondaryButton}"
                                     Command="{Binding ShareExportCommand}" />
                         </Grid>
+                        <Button Text="Sign out of Google" BackgroundColor="Transparent" TextColor="#6B7280"
+                                Command="{Binding SignOutCommand}" IsVisible="{Binding IsSignedIn}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource Card}" IsVisible="{Binding HasErrors}"
+                        BackgroundColor="#FEF2F2" Stroke="#FCA5A5">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Recent problems" Style="{StaticResource CardTitle}" />
+                        <Label Text="These are also included in the Drive export so they can be diagnosed."
+                               Style="{StaticResource Muted}" />
+                        <Label Text="{Binding ErrorText}" FontSize="12" TextColor="#7F1D1D" />
+                        <Button Text="Clear" Style="{StaticResource SecondaryButton}" Command="{Binding ClearErrorsCommand}" />
                     </VerticalStackLayout>
                 </Border>
 

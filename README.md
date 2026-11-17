@@ -4,7 +4,7 @@ A personal Android app (.NET MAUI) that:
 
 1. **Logs migraines**: start/end, peak pain 0–10, aura and symptoms, triptan taken plus time and 2-hour relief, other meds, possible triggers, notes. A one-tap "Took triptan now" / "It's over" card covers attacks in progress.
 2. **Reads Android Health Connect**: sleep, steps, heart rate (avg/min/max), resting heart rate, HRV (RMSSD), exercise sessions, weight. Pixel Watch data comes in through the Fitbit app's Health Connect sync.
-3. **Exports to a Google Drive file**: you pick the file once with the system picker (choose Drive), and the app rewrites it with the last 90 days of data when you open it (at most every 3 hours), after each migraine change, or when you tap "Export now".
+3. **Exports to Google Drive**: after you tap **Sign in with Google**, the app writes the last 90 days to `My Drive/HealthPulse/healthpulse-export.json` every night at 11:45 PM, when you open it (at most every 3 hours), after each migraine change, or when you tap "Export now". Recent app errors are included in the export so problems can be diagnosed remotely.
 
 No health data is stored in this repository. Everything stays on the phone and in your Drive file.
 
@@ -19,6 +19,14 @@ Each push to `main` builds an APK in GitHub Actions and publishes it as a [relea
 5. **Health** tab → **Choose export file** → pick **Drive** in the picker → save `healthpulse-export.json`.
 
 Updates install over the old version as long as the `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD` Actions secrets stay the same.
+
+## Google Cloud setup (one time)
+
+Google sign-in needs an OAuth client in a Google Cloud project owned by the Drive account:
+
+1. Create a project and enable the **Google Drive API**.
+2. OAuth consent screen: External, then **Publish app** (In production) so sign-in doesn't expire every 7 days. Only the non-sensitive `drive.file` scope is used, so no Google review is needed.
+3. Create an OAuth client of type **Android** with package `com.ericfriedman.healthpulse` and the SHA-1 of the release signing key.
 
 ## Export format
 

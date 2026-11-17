@@ -9,14 +9,22 @@ public partial class App : Application
     readonly HealthExportService exporter;
     readonly ILogger<App> logger;
 
-    public App(AppShell shell, HealthExportService exporter, ILogger<App> logger)
+    public App(AppShell shell, HealthExportService exporter, ErrorLog errors, ILogger<App> logger)
     {
         InitializeComponent();
         this.shell = shell;
         this.exporter = exporter;
         this.logger = logger;
         TaskScheduler.UnobservedTaskException += (_, args) =>
-            logger.LogError(args.Exception, "Unobserved task exception");
+        {
+            errors.Record("Background task", args.Exception);
+            args.SetObserved();
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            if (args.ExceptionObject is Exception exception)
+                errors.Record("Crash", exception);
+        };
     }
 
     protected override Window CreateWindow(IActivationState? activationState)

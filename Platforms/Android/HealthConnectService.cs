@@ -24,8 +24,11 @@ public class HealthConnectService : IHealthDataService
     public const string ReadExercise = "android.permission.health.READ_EXERCISE";
     public const string ReadWeight = "android.permission.health.READ_WEIGHT";
 
+    /// <summary>Lets the 11:45 PM export read data while the app isn't open (Android 14+).</summary>
+    public const string ReadInBackground = "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND";
+
     public static readonly string[] Permissions =
-        [ReadSteps, ReadSleep, ReadHeartRate, ReadRestingHeartRate, ReadHrv, ReadExercise, ReadWeight];
+        [ReadSteps, ReadSleep, ReadHeartRate, ReadRestingHeartRate, ReadHrv, ReadExercise, ReadWeight, ReadInBackground];
 
     public ILogger<HealthConnectService> Logger;
 
