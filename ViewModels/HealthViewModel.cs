@@ -20,7 +20,15 @@ public partial class HealthViewModel : ObservableObject
         Destination = destination;
         Exporter = exporter;
         Errors = errors;
+        Exporter.StatusChanged += status => MainThread.BeginInvokeOnMainThread(() =>
+        {
+            ProgressText = status;
+            if (status.Length == 0) RefreshExportStatus();
+        });
     }
+
+    /// <summary>How long the Health tab waits for Health Connect before showing an error.</summary>
+    public static readonly TimeSpan LoadTimeout = TimeSpan.FromSeconds(60);
 
     [ObservableProperty] public partial string ConnectionStatus { get; set; } = "";
     [ObservableProperty] public partial bool CanConnect { get; set; }
@@ -29,6 +37,7 @@ public partial class HealthViewModel : ObservableObject
     [ObservableProperty] public partial bool IsSignedIn { get; set; }
     [ObservableProperty] public partial bool IsBusy { get; set; }
     [ObservableProperty] public partial string ErrorText { get; set; } = "";
+    [ObservableProperty] public partial string ProgressText { get; set; } = "";
     [ObservableProperty] public partial bool HasErrors { get; set; }
     [ObservableProperty] public partial ObservableCollection<DailyHealthSummary> Days { get; set; } = [];
 
@@ -46,7 +55,8 @@ public partial class HealthViewModel : ObservableObject
             if (!CanConnect && HealthData.GetAvailability() == HealthDataAvailability.Available)
             {
                 var today = DateOnly.FromDateTime(DateTime.Today);
-                var days = await HealthData.GetDailySummariesAsync(today.AddDays(-13), today);
+                var days = await Timeouts.Limit(HealthData.GetDailySummariesAsync(today.AddDays(-13), today),
+                    LoadTimeout, "Reading Health Connect");
                 Days = new ObservableCollection<DailyHealthSummary>(days.OrderByDescending(d => d.Date));
             }
         }
@@ -90,10 +100,11 @@ public partial class HealthViewModel : ObservableObject
             ? $"Exports to {Destination.DestinationName}"
             : $"Sign in with Google to export to {DriveExportDestination.DrivePath}.";
         var last = Exporter.LastExportUtc;
+        var warning = Exporter.LastError == null && Exporter.LastWarning is { } w ? $" Some data was missing: {w}" : "";
         var next = NightlySchedule.NextRun(DateTime.Now, NightlySchedule.ExportTime);
         ExportStatus = (Exporter.LastError is { } error
                 ? $"Last export failed: {error}"
-                : last.HasValue ? $"Last exported {last.Value.ToLocalTime():ddd MMM d, h:mm tt}." : "Not exported yet.")
+                : last.HasValue ? $"Last exported {last.Value.ToLocalTime():ddd MMM d, h:mm tt}.{warning}" : "Not exported yet.")
             + $" Next nightly export: {next:ddd h:mm tt}. It also updates when you open the app and after each migraine change.";
     }
 
@@ -169,10 +180,13 @@ public partial class HealthViewModel : ObservableObject
             var error = await Exporter.ExportNowAsync();
             if (error != null)
                 await Shell.Current.DisplayAlertAsync("Export failed", error, "OK");
+            else if (Exporter.LastWarning is { } warning)
+                await Shell.Current.DisplayAlertAsync("Exported, with gaps", warning, "OK");
         }
         finally
         {
             IsBusy = false;
+            ProgressText = "";
         }
     });
 

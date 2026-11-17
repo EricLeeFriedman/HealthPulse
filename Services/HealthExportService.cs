@@ -18,6 +18,7 @@ public class HealthExportService
     public static readonly TimeSpan AutoExportInterval = TimeSpan.FromHours(3);
     public const string LastExportKey = "export_last_utc";
     public const string LastErrorKey = "export_last_error";
+    public const string LastWarningKey = "export_last_warning";
 
     public IHealthDataService HealthData;
     public IMigraineService Migraines;
@@ -30,6 +31,22 @@ public class HealthExportService
     public Func<IReadOnlyList<string>>? RecentErrors { get; set; }
 
     public Action<Exception>? ExportFailed { get; set; }
+
+    /// <summary>Time limits for each step, so one stuck call can't hang the export.</summary>
+    public TimeSpan HealthTimeout { get; set; } = TimeSpan.FromSeconds(90);
+    public TimeSpan WeatherTimeout { get; set; } = TimeSpan.FromSeconds(45);
+    public TimeSpan TrackerTimeout { get; set; } = TimeSpan.FromSeconds(30);
+    public TimeSpan UploadTimeout { get; set; } = TimeSpan.FromSeconds(90);
+    /// <summary>How long Export now waits for an export that's already running.</summary>
+    public TimeSpan LockTimeout { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>Reports which step the export is on, for the Health tab.</summary>
+    public event Action<string>? StatusChanged;
+
+    /// <summary>Problems in one step that didn't stop the export (health or weather timed out, say).</summary>
+    public List<string> LastWarnings { get; } = [];
+
+    void Status(string text) => StatusChanged?.Invoke(text);
 
     /// <summary>Check-ins, workouts, measurements, tests and weather to include.</summary>
     public ITrackerStore? Trackers { get; set; }
@@ -72,57 +89,62 @@ public class HealthExportService
 
     public string? LastError => Settings.GetString(LastErrorKey);
 
+    /// <summary>Set when the last export was written but part of it was missing.</summary>
+    public string? LastWarning => Settings.GetString(LastWarningKey);
+
     public async Task<string> BuildJsonAsync(DateOnly today, int days = DefaultDays)
     {
         var from = today.AddDays(-(days - 1));
 
+        LastWarnings.Clear();
         List<DailyHealthSummary> health = [];
         string? healthError = null;
         try
         {
+            Status("Reading Health Connect…");
             if (HealthData.GetAvailability() != HealthDataAvailability.Available)
                 healthError = "Health Connect is not available on this device";
-            else if (!await HealthData.HasPermissionsAsync())
+            else if (!await Timeouts.Limit(HealthData.HasPermissionsAsync(), HealthTimeout, "Checking Health Connect permissions"))
                 healthError = "Health Connect permissions not granted";
             else
-                health = await HealthData.GetDailySummariesAsync(from, today);
+                health = await Timeouts.Limit(HealthData.GetDailySummariesAsync(from, today), HealthTimeout, "Reading Health Connect");
         }
         catch (Exception exception)
         {
             Logger.LogError(exception, "Health Connect read failed during export");
             healthError = exception.Message;
+            if (exception is TimeoutException) LastWarnings.Add(exception.Message);
         }
 
-        var migraines = await Migraines.GetEntriesForRangeAsync(from, today);
+        Status("Reading migraines…");
+        var migraines = await Timeouts.Limit(Migraines.GetEntriesForRangeAsync(from, today), TrackerTimeout, "Reading migraines");
 
         string? weatherError = null;
         if (RefreshWeather != null)
         {
-            try { weatherError = await RefreshWeather(today, days); }
-            catch (Exception exception) { weatherError = exception.Message; }
+            Status("Updating weather…");
+            try { weatherError = await Timeouts.Limit(RefreshWeather(today, days), WeatherTimeout, "Updating weather"); }
+            catch (Exception exception)
+            {
+                weatherError = exception.Message;
+                if (exception is TimeoutException) LastWarnings.Add(exception.Message);
+            }
         }
 
         TrackerExport? trackers = null;
         string? trackerError = null;
         if (Trackers != null)
         {
+            Status("Reading trackers…");
             try
             {
-                // Workouts recorded on the watch count toward the plan without manual entry.
-                await WorkoutImporter.ImportAsync(Trackers, health.SelectMany(h => h.Exercise));
-
-                trackers = new TrackerExport(
-                    await Trackers.GetCheckInsAsync(from, today),
-                    await Trackers.GetWorkoutsAsync(from, today),
-                    await Trackers.GetMeasurementsAsync(from, today),
-                    await Trackers.GetFitnessTestsAsync(from, today),
-                    await Trackers.GetWeatherAsync(from, today),
-                    await Trackers.GetFoodAsync(from, today));
+                trackers = await Timeouts.Limit(ReadTrackersAsync(Trackers, health, from, today), TrackerTimeout, "Reading trackers");
             }
             catch (Exception exception)
             {
                 Logger.LogError(exception, "Reading trackers failed during export");
                 trackerError = $"Trackers: {exception.Message}";
+                LastWarnings.Add(trackerError);
             }
         }
 
@@ -132,6 +154,19 @@ public class HealthExportService
             errors, trackers, weatherError);
     }
 
+    static async Task<TrackerExport> ReadTrackersAsync(ITrackerStore store, List<DailyHealthSummary> health,
+        DateOnly from, DateOnly today)
+    {
+        // Workouts recorded on the watch count toward the plan without manual entry.
+        await WorkoutImporter.ImportAsync(store, health.SelectMany(h => h.Exercise));
+        return new TrackerExport(
+            await store.GetCheckInsAsync(from, today),
+            await store.GetWorkoutsAsync(from, today),
+            await store.GetMeasurementsAsync(from, today),
+            await store.GetFitnessTestsAsync(from, today),
+            await store.GetWeatherAsync(from, today),
+            await store.GetFoodAsync(from, today));
+    }
 
     public static string BuildJson(
         DateTime exportedAtUtc,
@@ -345,13 +380,27 @@ public class HealthExportService
         if (!Destination.HasDestination)
             return "Choose an export file first.";
 
-        await ExportLock.WaitAsync();
+        if (!await ExportLock.WaitAsync(TimeSpan.Zero))
+        {
+            Status("Waiting for the export that's already running…");
+            if (!await ExportLock.WaitAsync(LockTimeout))
+            {
+                var busy = $"Another export has been running for over {Timeouts.Describe(LockTimeout)}. Close and reopen the app, then try again.";
+                Settings.SetString(LastErrorKey, busy);
+                ExportFailed?.Invoke(new TimeoutException(busy));
+                return busy;
+            }
+        }
         try
         {
             var json = await BuildJsonAsync(DateOnly.FromDateTime(DateTime.Today));
-            await Destination.WriteAsync(json);
+            Status("Uploading to Google Drive…");
+            await Timeouts.Limit(Destination.WriteAsync(json), UploadTimeout, "Uploading to Google Drive");
             Settings.SetString(LastExportKey, DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
             Settings.SetString(LastErrorKey, null);
+            Settings.SetString(LastWarningKey, LastWarnings.Count > 0 ? string.Join(" ", LastWarnings) : null);
+            foreach (var warning in LastWarnings)
+                ExportFailed?.Invoke(new TimeoutException($"Export written without some data: {warning}"));
             Logger.LogInformation("Export written");
             return null;
         }
@@ -364,6 +413,7 @@ public class HealthExportService
         }
         finally
         {
+            Status("");
             ExportLock.Release();
         }
     }
