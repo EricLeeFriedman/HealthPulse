@@ -11,6 +11,7 @@ public static class ActivityResultBridge
 {
     static int nextRequestCode = 4100;
     static readonly Dictionary<int, TaskCompletionSource<(Result ResultCode, Intent? Data)>> Pending = [];
+    static readonly Dictionary<int, TaskCompletionSource<(string[] Permissions, int[] GrantResults)>> PendingPermissions = [];
 
     static Activity CurrentActivity =>
         Microsoft.Maui.ApplicationModel.Platform.CurrentActivity
@@ -58,6 +59,39 @@ public static class ActivityResultBridge
             if (!Pending.Remove(requestCode, out completion)) return false;
         }
         completion.TrySetResult((resultCode, data));
+        return true;
+    }
+
+    /// <summary>
+    /// Shows Android's runtime permission dialog and awaits the answer.
+    /// MainActivity forwards OnRequestPermissionsResult to TryCompletePermissions.
+    /// </summary>
+    public static Task<(string[] Permissions, int[] GrantResults)> RequestPermissionsAsync(string[] permissions)
+    {
+        var activity = CurrentActivity;
+        var requestCode = Interlocked.Increment(ref nextRequestCode) & 0xFFFF;
+        var completion = new TaskCompletionSource<(string[], int[])>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (PendingPermissions) PendingPermissions[requestCode] = completion;
+        try
+        {
+            activity.RequestPermissions(permissions, requestCode);
+        }
+        catch
+        {
+            lock (PendingPermissions) PendingPermissions.Remove(requestCode);
+            throw;
+        }
+        return completion.Task;
+    }
+
+    public static bool TryCompletePermissions(int requestCode, string[] permissions, int[] grantResults)
+    {
+        TaskCompletionSource<(string[], int[])>? completion;
+        lock (PendingPermissions)
+        {
+            if (!PendingPermissions.Remove(requestCode, out completion)) return false;
+        }
+        completion.TrySetResult((permissions, grantResults));
         return true;
     }
 }

@@ -18,5 +18,12 @@ namespace HealthPulse
                 return;
             base.OnActivityResult(requestCode, resultCode, data);
         }
+
+        public override void OnRequestPermissionsResult(int requestCode, string[] permissions, Permission[] grantResults)
+        {
+            if (ActivityResultBridge.TryCompletePermissions(requestCode, permissions, grantResults.Select(g => (int)g).ToArray()))
+                return;
+            base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+        }
     }
 }
