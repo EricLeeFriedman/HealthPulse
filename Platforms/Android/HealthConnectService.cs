@@ -85,9 +85,7 @@ public class HealthConnectService : IHealthDataService
 
     public async Task<List<DailyHealthSummary>> GetDailySummariesAsync(DateOnly from, DateOnly to)
     {
-        var summaries = new Dictionary<DateOnly, DailyHealthSummary>();
-        for (var date = from; date <= to; date = date.AddDays(1))
-            summaries[date] = new DailyHealthSummary { Date = date };
+        var summaries = HealthSummaryBuilder.CreateDays(from, to);
 
         if (GetAvailability() != HealthDataAvailability.Available)
             return summaries.Values.ToList();
@@ -178,88 +176,32 @@ public class HealthConnectService : IHealthDataService
         return value == null ? null : value.JavaCast<Java.Lang.Number>().LongValue();
     }
 
-    // ---------------------------------------------------------------------
-    // Sleep: sessions are attributed to the local date they end on, so
-    // "Tuesday's sleep" is the night from Monday into Tuesday.
-    // ---------------------------------------------------------------------
     async Task ReadSleepAsync(DateTime start, DateTime end, Dictionary<DateOnly, DailyHealthSummary> summaries)
     {
+        // Look back far enough to catch a night that started the evening before the range.
         var records = await ReadAllAsync<SleepSessionRecord>(start.AddHours(-18), end);
         foreach (var record in records)
-        {
-            var sessionStart = ToLocal(record.StartTime);
-            var sessionEnd = ToLocal(record.EndTime);
-            var date = DateOnly.FromDateTime(sessionEnd);
-            if (!summaries.TryGetValue(date, out var summary)) continue;
-
-            var hours = (sessionEnd - sessionStart).TotalHours;
-            summary.SleepHours = Math.Round((summary.SleepHours ?? 0) + hours, 2);
-            // Keep the start/end of the longest session as the main night.
-            if (summary.SleepStart == null
-                || hours > ((summary.SleepEnd ?? sessionEnd) - summary.SleepStart.Value).TotalHours)
-            {
-                summary.SleepStart = sessionStart;
-                summary.SleepEnd = sessionEnd;
-            }
-        }
+            HealthSummaryBuilder.AddSleepSession(summaries, ToLocal(record.StartTime), ToLocal(record.EndTime));
     }
 
     async Task ReadHrvAsync(DateTime start, DateTime end, Dictionary<DateOnly, DailyHealthSummary> summaries)
     {
         var records = await ReadAllAsync<HeartRateVariabilityRmssdRecord>(start, end);
-        foreach (var group in records.GroupBy(r => DateOnly.FromDateTime(ToLocal(r.Time))))
-        {
-            if (summaries.TryGetValue(group.Key, out var summary))
-                summary.HrvRmssdMs = group.Average(r => r.HeartRateVariabilityMillis);
-        }
+        HealthSummaryBuilder.SetHrv(summaries, records.Select(r => (ToLocal(r.Time), r.HeartRateVariabilityMillis)));
     }
 
     async Task ReadExerciseAsync(DateTime start, DateTime end, Dictionary<DateOnly, DailyHealthSummary> summaries)
     {
         var records = await ReadAllAsync<ExerciseSessionRecord>(start, end);
         foreach (var record in records)
-        {
-            var sessionStart = ToLocal(record.StartTime);
-            if (!summaries.TryGetValue(DateOnly.FromDateTime(sessionStart), out var summary)) continue;
-            var typeName = ExerciseTypeName(record.ExerciseType);
-            summary.Exercise.Add(new ExerciseSummary
-            {
-                Type = typeName,
-                Title = record.Title,
-                Start = sessionStart,
-                Minutes = (ToLocal(record.EndTime) - sessionStart).TotalMinutes
-            });
-        }
+            HealthSummaryBuilder.AddExercise(summaries, record.ExerciseType, record.Title,
+                ToLocal(record.StartTime), ToLocal(record.EndTime));
     }
-
-    static string ExerciseTypeName(int type) => type switch
-    {
-        ExerciseSessionRecord.ExerciseTypeWalking => "walking",
-        ExerciseSessionRecord.ExerciseTypeRunning => "running",
-        ExerciseSessionRecord.ExerciseTypeBiking => "biking",
-        ExerciseSessionRecord.ExerciseTypeBikingStationary => "stationary_biking",
-        ExerciseSessionRecord.ExerciseTypeHiking => "hiking",
-        ExerciseSessionRecord.ExerciseTypeStrengthTraining => "strength_training",
-        ExerciseSessionRecord.ExerciseTypeWeightlifting => "weightlifting",
-        ExerciseSessionRecord.ExerciseTypeHighIntensityIntervalTraining => "hiit",
-        ExerciseSessionRecord.ExerciseTypeElliptical => "elliptical",
-        ExerciseSessionRecord.ExerciseTypeRowingMachine => "rowing_machine",
-        ExerciseSessionRecord.ExerciseTypeSwimmingPool => "swimming",
-        ExerciseSessionRecord.ExerciseTypeYoga => "yoga",
-        ExerciseSessionRecord.ExerciseTypePilates => "pilates",
-        ExerciseSessionRecord.ExerciseTypeCalisthenics => "calisthenics",
-        ExerciseSessionRecord.ExerciseTypeOtherWorkout => "other",
-        _ => $"type_{type}"
-    };
 
     async Task ReadWeightAsync(DateTime start, DateTime end, Dictionary<DateOnly, DailyHealthSummary> summaries)
     {
         var records = await ReadAllAsync<WeightRecord>(start, end);
-        foreach (var record in records.OrderBy(r => r.Time.ToEpochMilli()))
-        {
-            if (summaries.TryGetValue(DateOnly.FromDateTime(ToLocal(record.Time)), out var summary))
-                summary.WeightLbs = record.Weight.Pounds;
-        }
+        HealthSummaryBuilder.SetWeights(summaries, records.Select(r => (ToLocal(r.Time), r.Weight.Pounds)));
     }
 
     async Task<List<T>> ReadAllAsync<T>(DateTime start, DateTime end)

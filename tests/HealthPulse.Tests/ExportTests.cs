@@ -69,8 +69,66 @@ public class ExportTests
         await migraines.Database.CloseAsync();
     }
 
+    [Fact]
+    public async Task Export_IncludesHealthConnectDataWhenPermitted()
+    {
+        var destination = new FakeDestination();
+        var migraines = new LocalMigraineService(Path.Combine(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.db3"));
+        var exporter = new HealthExportService(new FakeHealth(), migraines, destination, new InMemorySettingsStore());
+
+        Assert.Null(await exporter.ExportNowAsync());
+
+        using var doc = JsonDocument.Parse(destination.Last);
+        Assert.False(doc.RootElement.TryGetProperty("healthConnectError", out _));
+        var days = doc.RootElement.GetProperty("days");
+        Assert.Equal(HealthExportService.DefaultDays, days.GetArrayLength());
+        Assert.Equal(6.5, days[days.GetArrayLength() - 1].GetProperty("sleepHours").GetDouble());
+        await migraines.Database.CloseAsync();
+    }
+
+    [Fact]
+    public async Task Export_WithoutDestination_ReturnsMessageAndDoesNothing()
+    {
+        var migraines = new LocalMigraineService(Path.Combine(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.db3"));
+        var exporter = new HealthExportService(new UnsupportedHealthDataService(), migraines,
+            new UnsupportedExportDestination(), new InMemorySettingsStore());
+
+        Assert.Equal("Choose an export file first.", await exporter.ExportNowAsync());
+        await exporter.ExportIfDueAsync(force: true);
+        Assert.Null(exporter.LastExportUtc);
+        await migraines.Database.CloseAsync();
+    }
+
+    [Fact]
+    public async Task Export_WriteFailure_IsRecordedThenClearedOnSuccess()
+    {
+        var destination = new FakeDestination { FailNext = true };
+        var settings = new InMemorySettingsStore();
+        var migraines = new LocalMigraineService(Path.Combine(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.db3"));
+        var exporter = new HealthExportService(new UnsupportedHealthDataService(), migraines, destination, settings);
+
+        Assert.Equal("Drive offline", await exporter.ExportNowAsync());
+        Assert.Equal("Drive offline", exporter.LastError);
+        Assert.Null(exporter.LastExportUtc);
+
+        Assert.Null(await exporter.ExportNowAsync());
+        Assert.Null(exporter.LastError);
+        Assert.NotNull(exporter.LastExportUtc);
+        await migraines.Database.CloseAsync();
+    }
+
+    sealed class FakeHealth : IHealthDataService
+    {
+        public HealthDataAvailability GetAvailability() => HealthDataAvailability.Available;
+        public Task<bool> HasPermissionsAsync() => Task.FromResult(true);
+        public Task<bool> RequestPermissionsAsync() => Task.FromResult(true);
+        public Task<List<DailyHealthSummary>> GetDailySummariesAsync(DateOnly from, DateOnly to) =>
+            Task.FromResult(new List<DailyHealthSummary> { new() { Date = to, SleepHours = 6.5 } });
+    }
+
     sealed class FakeDestination : IExportDestination
     {
+        public bool FailNext;
         public int Writes;
         public string Last = "";
         public bool HasDestination => true;
@@ -78,6 +136,11 @@ public class ExportTests
         public Task<bool> ChooseDestinationAsync(string suggestedFileName) => Task.FromResult(true);
         public Task WriteAsync(string content)
         {
+            if (FailNext)
+            {
+                FailNext = false;
+                throw new IOException("Drive offline");
+            }
             Writes++;
             Last = content;
             return Task.CompletedTask;

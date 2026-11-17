@@ -33,7 +33,7 @@ public partial class MigraineEditViewModel : ObservableObject, IQueryAttributabl
         LoadFrom(entry);
     }
 
-    public List<string> ReliefOptions { get; } = ["Not yet known", .. MigraineEntry.ReliefOptions];
+    public List<string> ReliefOptions { get; } = [.. MigraineForm.ReliefChoices];
 
     [ObservableProperty] public partial bool IsExisting { get; set; }
     [ObservableProperty] public partial string PageTitle { get; set; } = "Log migraine";
@@ -81,50 +81,53 @@ public partial class MigraineEditViewModel : ObservableObject, IQueryAttributabl
 
     void LoadFrom(MigraineEntry source)
     {
-        var now = DateTime.Now;
-        StartDate = source.StartTime.Date;
-        StartClock = source.StartTime.TimeOfDay;
-        IsOngoing = source.EndTime == null;
-        var end = source.EndTime ?? now;
-        EndDate = end.Date;
-        EndClock = end.TimeOfDay;
-        Severity = source.PeakSeverity;
-        Aura = source.Aura;
-        Nausea = source.Nausea;
-        LightSensitivity = source.LightSensitivity;
-        SoundSensitivity = source.SoundSensitivity;
-        TriptanTaken = source.TriptanTaken;
-        var triptan = source.TriptanTime ?? now;
-        TriptanDate = triptan.Date;
-        TriptanClock = triptan.TimeOfDay;
-        ReliefIndex = source.TriptanRelief == null
-            ? 0
-            : Math.Max(0, Array.IndexOf(MigraineEntry.ReliefOptions, source.TriptanRelief) + 1);
-        OtherMeds = source.OtherMeds ?? "";
-        Notes = source.Notes ?? "";
-
+        var form = MigraineForm.FromEntry(source, DateTime.Now);
+        StartDate = form.StartDate;
+        StartClock = form.StartClock;
+        IsOngoing = form.IsOngoing;
+        EndDate = form.EndDate;
+        EndClock = form.EndClock;
+        Severity = form.Severity;
+        Aura = form.Aura;
+        Nausea = form.Nausea;
+        LightSensitivity = form.LightSensitivity;
+        SoundSensitivity = form.SoundSensitivity;
+        TriptanTaken = form.TriptanTaken;
+        TriptanDate = form.TriptanDate;
+        TriptanClock = form.TriptanClock;
+        ReliefIndex = form.ReliefIndex;
+        OtherMeds = form.OtherMeds;
+        Notes = form.Notes;
         Triggers.Clear();
-        var selected = source.TriggerList.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var name in MigraineEntry.TriggerOptions.Concat(selected.Except(MigraineEntry.TriggerOptions)))
-            Triggers.Add(new TriggerOption(name, selected.Contains(name)));
+        foreach (var (name, selected) in form.Triggers)
+            Triggers.Add(new TriggerOption(name, selected));
     }
+
+    MigraineForm ToForm() => new()
+    {
+        StartDate = StartDate,
+        StartClock = StartClock,
+        IsOngoing = IsOngoing,
+        EndDate = EndDate,
+        EndClock = EndClock,
+        Severity = Severity,
+        Aura = Aura,
+        Nausea = Nausea,
+        LightSensitivity = LightSensitivity,
+        SoundSensitivity = SoundSensitivity,
+        TriptanTaken = TriptanTaken,
+        TriptanDate = TriptanDate,
+        TriptanClock = TriptanClock,
+        ReliefIndex = ReliefIndex,
+        OtherMeds = OtherMeds,
+        Notes = Notes,
+        Triggers = Triggers.Select(t => (t.Name, t.IsSelected)).ToList()
+    };
 
     [RelayCommand]
     async Task SaveAsync()
     {
-        entry.StartTime = StartDate.Date + StartClock;
-        entry.EndTime = IsOngoing ? null : EndDate.Date + EndClock;
-        entry.PeakSeverity = (int)Math.Round(Severity);
-        entry.Aura = Aura;
-        entry.Nausea = Nausea;
-        entry.LightSensitivity = LightSensitivity;
-        entry.SoundSensitivity = SoundSensitivity;
-        entry.TriptanTaken = TriptanTaken;
-        entry.TriptanTime = TriptanTaken ? TriptanDate.Date + TriptanClock : null;
-        entry.TriptanRelief = TriptanTaken && ReliefIndex > 0 ? MigraineEntry.ReliefOptions[ReliefIndex - 1] : null;
-        entry.OtherMeds = string.IsNullOrWhiteSpace(OtherMeds) ? null : OtherMeds.Trim();
-        entry.Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim();
-        entry.TriggerList = Triggers.Where(t => t.IsSelected).Select(t => t.Name).ToList();
+        ToForm().ApplyTo(entry);
 
         try
         {

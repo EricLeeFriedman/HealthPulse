@@ -17,6 +17,9 @@
     <Compile Include="..\..\Services\IExportDestination.cs" Link="App\IExportDestination.cs" />
     <Compile Include="..\..\Services\ISettingsStore.cs" Link="App\ISettingsStore.cs" />
     <Compile Include="..\..\Services\HealthExportService.cs" Link="App\HealthExportService.cs" />
+    <Compile Include="..\..\Services\HealthSummaryBuilder.cs" Link="App\HealthSummaryBuilder.cs" />
+    <Compile Include="..\..\Services\MigraineStats.cs" Link="App\MigraineStats.cs" />
+    <Compile Include="..\..\Services\MigraineForm.cs" Link="App\MigraineForm.cs" />
   </ItemGroup>
 
   <ItemGroup>
