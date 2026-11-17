@@ -190,3 +190,28 @@ public class WeatherDay
     public int Hours { get; set; }
     public DateTime FetchedAtUtc { get; set; } = DateTime.UtcNow;
 }
+
+/// <summary>A free-text meal or snack entry, e.g. "3 eggs, toast, big latte".</summary>
+public class FoodEntry
+{
+    [PrimaryKey]
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+
+    /// <summary>Local time eaten.</summary>
+    [Indexed]
+    public DateTime Time { get; set; } = DateTime.Now;
+
+    /// <summary>What was eaten, with rough portions.</summary>
+    public string Text { get; set; } = "";
+
+    /// <summary>Optional protein estimate in grams.</summary>
+    public int? ProteinGrams { get; set; }
+
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    [Ignore]
+    public string DisplayTime => Time.ToString("h:mm tt");
+
+    [Ignore]
+    public string Display => ProteinGrams.HasValue ? $"{Text}  •  {ProteinGrams} g protein" : Text;
+}
