@@ -9,12 +9,16 @@ namespace HealthPulse.Platforms.Android;
 /// </summary>
 public static class KotlinTask
 {
-    public static async Task<Java.Lang.Object?> AwaitAsync(Func<IContinuation, Java.Lang.Object?> call)
+    /// <summary>How long one Health Connect call may take before it counts as stuck.</summary>
+    public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
+
+    public static async Task<Java.Lang.Object?> AwaitAsync(Func<IContinuation, Java.Lang.Object?> call,
+        TimeSpan? timeout = null)
     {
         var continuation = new TaskContinuation();
         var immediate = call(continuation);
         if (IsSuspended(immediate))
-            return await continuation.Task;
+            return await HealthPulse.Services.Timeouts.Limit(continuation.Task, timeout ?? DefaultTimeout, "A Health Connect call");
         return Unwrap(immediate);
     }
 

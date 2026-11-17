@@ -25,6 +25,7 @@
                         <Label Text="Google Drive export" Style="{StaticResource CardTitle}" />
                         <Label Text="{Binding DriveText}" FontSize="14" TextColor="#374151" />
                         <Label Text="{Binding ExportStatus}" Style="{StaticResource Muted}" />
+                        <Label Text="{Binding ProgressText}" FontSize="14" TextColor="#0F766E" />
                         <Button Text="Sign in with Google" Style="{StaticResource PrimaryButton}"
                                 Command="{Binding SignInCommand}" IsVisible="{Binding IsSignedOut}" />
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="10" IsVisible="{Binding IsSignedIn}">
