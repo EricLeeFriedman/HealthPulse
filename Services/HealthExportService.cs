@@ -33,7 +33,7 @@ public class HealthExportService
     public Action<Exception>? ExportFailed { get; set; }
 
     /// <summary>Time limits for each step, so one stuck call can't hang the export.</summary>
-    public TimeSpan HealthTimeout { get; set; } = TimeSpan.FromSeconds(90);
+    public TimeSpan HealthTimeout { get; set; } = TimeSpan.FromSeconds(150);
     public TimeSpan WeatherTimeout { get; set; } = TimeSpan.FromSeconds(45);
     public TimeSpan TrackerTimeout { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan UploadTimeout { get; set; } = TimeSpan.FromSeconds(90);
@@ -150,8 +150,10 @@ public class HealthExportService
 
         var errors = RecentErrors?.Invoke()?.ToList() ?? [];
         if (trackerError != null) errors.Insert(0, trackerError);
+        IReadOnlyList<string>? healthSteps = null;
+        try { healthSteps = HealthData.LastReadSteps; } catch { /* diagnostics only */ }
         return BuildJson(DateTime.UtcNow, TimeZoneInfo.Local.Id, from, today, health, migraines, healthError,
-            errors, trackers, weatherError);
+            errors, trackers, weatherError, healthSteps);
     }
 
     static async Task<TrackerExport> ReadTrackersAsync(ITrackerStore store, List<DailyHealthSummary> health,
@@ -178,7 +180,8 @@ public class HealthExportService
         string? healthError = null,
         IReadOnlyList<string>? appErrors = null,
         TrackerExport? trackers = null,
-        string? weatherError = null)
+        string? weatherError = null,
+        IReadOnlyList<string>? healthSteps = null)
     {
         var healthByDate = health.ToDictionary(h => h.Date);
         var migraineList = migraines.OrderBy(m => m.StartTime).ToList();
@@ -279,6 +282,7 @@ public class HealthExportService
             from = from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             to = to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             healthConnectError = healthError,
+            healthConnectSteps = healthSteps is { Count: > 0 } ? healthSteps : null,
             weatherError,
             appErrors = appErrors is { Count: > 0 } ? appErrors : null,
             notes = "Times are local. sleepHours sums sleep sessions that ended on that date (the night before it). Heart rate values are beats per minute. Pressure is sea-level hPa from Open-Meteo for the phone's coarse location; pressureMaxDrop6hHpa is the biggest 6-hour fall ending that day. Progress photos stay on the phone and are only counted here. meals are free-text food entries with rough portions; proteinGrams on a meal is the user's own estimate.",

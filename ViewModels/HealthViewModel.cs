@@ -28,7 +28,7 @@ public partial class HealthViewModel : ObservableObject
     }
 
     /// <summary>How long the Health tab waits for Health Connect before showing an error.</summary>
-    public static readonly TimeSpan LoadTimeout = TimeSpan.FromSeconds(60);
+    public static readonly TimeSpan LoadTimeout = TimeSpan.FromSeconds(150);
 
     [ObservableProperty] public partial string ConnectionStatus { get; set; } = "";
     [ObservableProperty] public partial bool CanConnect { get; set; }
