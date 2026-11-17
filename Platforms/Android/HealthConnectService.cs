@@ -23,12 +23,13 @@ public class HealthConnectService : IHealthDataService
     public const string ReadHrv = "android.permission.health.READ_HEART_RATE_VARIABILITY";
     public const string ReadExercise = "android.permission.health.READ_EXERCISE";
     public const string ReadWeight = "android.permission.health.READ_WEIGHT";
+    public const string ReadDistance = "android.permission.health.READ_DISTANCE";
 
     /// <summary>Lets the 11:45 PM export read data while the app isn't open (Android 14+).</summary>
     public const string ReadInBackground = "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND";
 
     public static readonly string[] Permissions =
-        [ReadSteps, ReadSleep, ReadHeartRate, ReadRestingHeartRate, ReadHrv, ReadExercise, ReadWeight, ReadInBackground];
+        [ReadSteps, ReadSleep, ReadHeartRate, ReadRestingHeartRate, ReadHrv, ReadExercise, ReadDistance, ReadWeight, ReadInBackground];
 
     public ILogger<HealthConnectService> Logger;
 
@@ -115,7 +116,7 @@ public class HealthConnectService : IHealthDataService
         if (granted.Contains(ReadHrv))
             await Try("hrv", () => ReadHrvAsync(start, end, summaries));
         if (granted.Contains(ReadExercise))
-            await Try("exercise", () => ReadExerciseAsync(start, end, summaries));
+            await Try("exercise", () => ReadExerciseAsync(granted, start, end, summaries));
         if (granted.Contains(ReadWeight))
             await Try("weight", () => ReadWeightAsync(start, end, summaries));
 
@@ -156,10 +157,10 @@ public class HealthConnectService : IHealthDataService
         if (metrics.Count == 0) return;
 
         var request = new AggregateGroupByPeriodRequest(
-            metrics,
+            new JavaSet<AggregateMetric>(metrics),
             TimeRangeFilter.Between(ToLocalDateTime(start), ToLocalDateTime(end)),
             Java.Time.Period.OfDays(1)!,
-            new List<DataOrigin>());
+            new JavaSet<DataOrigin>());
         var result = await KotlinTask.AwaitAsync(c => Client.AggregateGroupByPeriod(request, c));
         if (result == null) return;
 
@@ -205,12 +206,78 @@ public class HealthConnectService : IHealthDataService
         HealthSummaryBuilder.SetHrv(summaries, records.Select(r => (ToLocal(r.Time), r.HeartRateVariabilityMillis)));
     }
 
-    async Task ReadExerciseAsync(DateTime start, DateTime end, Dictionary<DateOnly, DailyHealthSummary> summaries)
+    /// <summary>Per-session heart rate and distance are only looked up for recent sessions, to keep reads fast.</summary>
+    static readonly TimeSpan SessionDetailWindow = TimeSpan.FromDays(21);
+
+    async Task ReadExerciseAsync(HashSet<string> granted, DateTime start, DateTime end,
+        Dictionary<DateOnly, DailyHealthSummary> summaries)
     {
         var records = await ReadAllAsync<ExerciseSessionRecord>(start, end);
+        var detailSince = DateTime.Now - SessionDetailWindow;
         foreach (var record in records)
-            HealthSummaryBuilder.AddExercise(summaries, record.ExerciseType, record.Title,
-                ToLocal(record.StartTime), ToLocal(record.EndTime));
+        {
+            var sessionStart = ToLocal(record.StartTime);
+            var sessionEnd = ToLocal(record.EndTime);
+            var summary = HealthSummaryBuilder.AddExercise(summaries, ExerciseName(record.ExerciseType), record.Title,
+                sessionStart, sessionEnd, record.Metadata.Id);
+            if (summary == null || sessionStart < detailSince || summary.Minutes < 5) continue;
+            await Try("exercise details", () => ReadSessionDetailsAsync(granted, record, summary));
+        }
+    }
+
+    async Task ReadSessionDetailsAsync(HashSet<string> granted, ExerciseSessionRecord record, ExerciseSummary summary)
+    {
+        var metrics = new List<AggregateMetric>();
+        if (granted.Contains(ReadHeartRate))
+        {
+            metrics.Add(HeartRateRecord.BpmAvg);
+            metrics.Add(HeartRateRecord.BpmMax);
+        }
+        if (granted.Contains(ReadDistance)) metrics.Add(DistanceRecord.DistanceTotal);
+        if (metrics.Count == 0) return;
+
+        var request = new AggregateRequest(
+            new JavaSet<AggregateMetric>(metrics),
+            TimeRangeFilter.Between(record.StartTime, record.EndTime),
+            new JavaSet<DataOrigin>());
+        var result = await KotlinTask.AwaitAsync(c => Client.Aggregate(request, c));
+        if (result == null) return;
+        var values = result.JavaCast<AggregationResult>();
+
+        if (granted.Contains(ReadHeartRate))
+        {
+            summary.AvgHeartRate = GetLong(values, HeartRateRecord.BpmAvg);
+            summary.MaxHeartRate = GetLong(values, HeartRateRecord.BpmMax);
+        }
+        if (granted.Contains(ReadDistance) && values.Contains(DistanceRecord.DistanceTotal)
+            && values.Get(DistanceRecord.DistanceTotal) is Java.Lang.Object distance)
+        {
+            summary.DistanceMiles = distance.JavaCast<AndroidX.Health.Connect.Client.Units.Length>().Miles;
+        }
+    }
+
+    /// <summary>Names for exercise types, from the library's own constants.</summary>
+    static string ExerciseName(int type)
+    {
+        if (type == ExerciseSessionRecord.ExerciseTypeRunning) return "running";
+        if (type == ExerciseSessionRecord.ExerciseTypeRunningTreadmill) return "running_treadmill";
+        if (type == ExerciseSessionRecord.ExerciseTypeWalking) return "walking";
+        if (type == ExerciseSessionRecord.ExerciseTypeHiking) return "hiking";
+        if (type == ExerciseSessionRecord.ExerciseTypeStrengthTraining) return "strength_training";
+        if (type == ExerciseSessionRecord.ExerciseTypeWeightlifting) return "weightlifting";
+        if (type == ExerciseSessionRecord.ExerciseTypeCalisthenics) return "calisthenics";
+        if (type == ExerciseSessionRecord.ExerciseTypeStretching) return "stretching";
+        if (type == ExerciseSessionRecord.ExerciseTypeYoga) return "yoga";
+        if (type == ExerciseSessionRecord.ExerciseTypePilates) return "pilates";
+        if (type == ExerciseSessionRecord.ExerciseTypeHighIntensityIntervalTraining) return "hiit";
+        if (type == ExerciseSessionRecord.ExerciseTypeBiking) return "biking";
+        if (type == ExerciseSessionRecord.ExerciseTypeBikingStationary) return "stationary_biking";
+        if (type == ExerciseSessionRecord.ExerciseTypeElliptical) return "elliptical";
+        if (type == ExerciseSessionRecord.ExerciseTypeRowingMachine) return "rowing_machine";
+        if (type == ExerciseSessionRecord.ExerciseTypeGuidedBreathing) return "guided_breathing";
+        if (type == ExerciseSessionRecord.ExerciseTypeWheelchair) return "wheelchair";
+        if (type == ExerciseSessionRecord.ExerciseTypeOtherWorkout) return "other";
+        return HealthSummaryBuilder.ExerciseTypeName(type);
     }
 
     async Task ReadWeightAsync(DateTime start, DateTime end, Dictionary<DateOnly, DailyHealthSummary> summaries)
@@ -228,7 +295,7 @@ public class HealthConnectService : IHealthDataService
         string? pageToken = null;
         do
         {
-            var request = new ReadRecordsRequest(recordType, filter, new List<DataOrigin>(), true, 1000, pageToken);
+            var request = new ReadRecordsRequest(recordType, filter, new JavaSet<DataOrigin>(), true, 1000, pageToken);
             var result = await KotlinTask.AwaitAsync(c => Client.ReadRecords(request, c));
             if (result == null) break;
             var response = result.JavaCast<ReadRecordsResponse>();

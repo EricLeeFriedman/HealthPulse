@@ -13,6 +13,7 @@
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="8">
                     <Label Text="Session" Style="{StaticResource CardTitle}" />
+                    <Label Text="{Binding DetectedText}" FontSize="13" TextColor="#0F766E" IsVisible="{Binding IsDetected}" />
                     <Picker ItemsSource="{Binding SessionTypes}" SelectedIndex="{Binding TypeIndex}" Title="Session type" />
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                         <DatePicker Date="{Binding Date}" Format="ddd MMM d" />

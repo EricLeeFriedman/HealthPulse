@@ -17,5 +17,7 @@ public partial class FitnessPage : ContentPage
     {
         base.OnAppearing();
         await viewModel.LoadAsync();
+        await viewModel.SyncAsync();
+        await viewModel.LoadAsync();
     }
 }

@@ -44,8 +44,13 @@ public class DailyHealthSummary
 
 public class ExerciseSummary
 {
+    /// <summary>Health Connect record id; stable across reads, used to avoid importing a session twice.</summary>
+    public string? Id { get; set; }
     public string Type { get; set; } = "";
     public string? Title { get; set; }
     public DateTime Start { get; set; }
     public double Minutes { get; set; }
+    public double? DistanceMiles { get; set; }
+    public double? AvgHeartRate { get; set; }
+    public double? MaxHeartRate { get; set; }
 }

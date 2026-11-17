@@ -50,16 +50,25 @@ public static class HealthSummaryBuilder
 
     /// <summary>Exercise belongs to the date it starts on.</summary>
     public static void AddExercise(
-        Dictionary<DateOnly, DailyHealthSummary> days, int exerciseType, string? title, DateTime start, DateTime end)
+        Dictionary<DateOnly, DailyHealthSummary> days, int exerciseType, string? title, DateTime start, DateTime end) =>
+        AddExercise(days, ExerciseTypeName(exerciseType), title, start, end);
+
+    /// <summary>Exercise belongs to the date it starts on.</summary>
+    public static ExerciseSummary? AddExercise(
+        Dictionary<DateOnly, DailyHealthSummary> days, string typeName, string? title, DateTime start, DateTime end,
+        string? id = null)
     {
-        if (!days.TryGetValue(DateOnly.FromDateTime(start), out var day)) return;
-        day.Exercise.Add(new ExerciseSummary
+        if (!days.TryGetValue(DateOnly.FromDateTime(start), out var day)) return null;
+        var summary = new ExerciseSummary
         {
-            Type = ExerciseTypeName(exerciseType),
+            Id = string.IsNullOrEmpty(id) ? null : id,
+            Type = typeName,
             Title = string.IsNullOrWhiteSpace(title) ? null : title,
             Start = start,
             Minutes = Math.Max(0, (end - start).TotalMinutes)
-        });
+        };
+        day.Exercise.Add(summary);
+        return summary;
     }
 
     /// <summary>The last weigh-in of each day wins.</summary>
@@ -85,7 +94,9 @@ public static class HealthSummaryBuilder
         48 => "pilates",
         54 => "rowing_machine",
         56 => "running",
+        57 => "running_treadmill",
         70 => "strength_training",
+        71 => "stretching",
         74 => "swimming",
         79 => "walking",
         81 => "weightlifting",

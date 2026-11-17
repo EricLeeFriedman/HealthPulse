@@ -87,6 +87,8 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
     [ObservableProperty] public partial bool IsRun { get; set; }
     [ObservableProperty] public partial bool IsMobility { get; set; }
     [ObservableProperty] public partial string NewExercise { get; set; } = "";
+    [ObservableProperty] public partial string DetectedText { get; set; } = "";
+    [ObservableProperty] public partial bool IsDetected { get; set; }
     [ObservableProperty] public partial ObservableCollection<ExerciseLog> Exercises { get; set; } = [];
 
     public string MobilityText => string.Join("\n", WorkoutPlan.MobilityRoutine.Select((m, i) => $"{i + 1}. {m}"));
@@ -119,6 +121,16 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
                 Distance = existing.DistanceMiles?.ToString("0.##", CultureInfo.CurrentCulture) ?? "";
                 Notes = existing.Notes ?? "";
                 TypeIndex = SessionTypes.IndexOf(existing.SessionType);
+                IsDetected = existing.ExternalId != null;
+                if (IsDetected)
+                {
+                    var details = new List<string> { (existing.ExerciseType ?? "workout").Replace('_', ' ') };
+                    if (existing.DurationMinutes.HasValue) details.Add($"{existing.DurationMinutes} min");
+                    if (existing.DistanceMiles.HasValue) details.Add($"{existing.DistanceMiles:0.##} mi");
+                    if (existing.AvgHeartRate.HasValue) details.Add($"avg heart rate {existing.AvgHeartRate:0}");
+                    if (existing.MaxHeartRate.HasValue) details.Add($"max {existing.MaxHeartRate:0}");
+                    DetectedText = $"⌚ From your watch: {string.Join(", ", details)}. Change the session if it was a different one. Sets and weights are optional.";
+                }
                 building = false;
                 BuildExercises(existing.Sets);
             }
@@ -221,7 +233,10 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
     Task DeleteAsync() => UiActions.RunAsync(Errors, "Deleting workout", async () =>
     {
         if (!IsExisting) return;
-        if (!await Shell.Current.DisplayAlertAsync("Delete workout?", "This can't be undone.", "Delete", "Cancel")) return;
+        var message = IsDetected
+            ? "It won't be imported from your watch again."
+            : "This can't be undone.";
+        if (!await Shell.Current.DisplayAlertAsync("Delete workout?", message, "Delete", "Cancel")) return;
         await Store.DeleteWorkoutAsync(session.Id);
         await Shell.Current.GoToAsync("..");
     });

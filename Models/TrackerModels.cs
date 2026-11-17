@@ -66,6 +66,27 @@ public class WorkoutSession
     public string? Notes { get; set; }
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    /// <summary>"manual" or "health_connect".</summary>
+    public string Source { get; set; } = ManualSource;
+
+    /// <summary>Health Connect exercise session id for detected workouts.</summary>
+    [Indexed]
+    public string? ExternalId { get; set; }
+
+    /// <summary>The watch's exercise type, e.g. running or strength_training.</summary>
+    public string? ExerciseType { get; set; }
+    public double? AvgHeartRate { get; set; }
+    public double? MaxHeartRate { get; set; }
+
+    /// <summary>A detected workout the user deleted; kept so it isn't imported again.</summary>
+    public bool Hidden { get; set; }
+
+    public const string ManualSource = "manual";
+    public const string HealthConnectSource = "health_connect";
+
+    [Ignore]
+    public bool IsDetected => Source == HealthConnectSource;
+
     [Ignore]
     public List<WorkoutSet> Sets { get; set; } = [];
 
@@ -77,9 +98,10 @@ public class WorkoutSession
     {
         get
         {
-            var parts = new List<string> { SessionType };
+            var parts = new List<string> { IsDetected ? $"⌚ {SessionType}" : SessionType };
             if (DurationMinutes.HasValue) parts.Add($"{DurationMinutes} min");
             if (DistanceMiles.HasValue) parts.Add($"{DistanceMiles:0.##} mi");
+            if (AvgHeartRate.HasValue) parts.Add($"avg {AvgHeartRate:0} bpm");
             var exercises = Sets.Select(s => s.Exercise).Distinct().Count();
             if (exercises > 0) parts.Add($"{exercises} exercises, {Sets.Count} sets");
             return string.Join(" • ", parts);
