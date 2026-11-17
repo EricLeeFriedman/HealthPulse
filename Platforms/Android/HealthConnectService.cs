@@ -78,11 +78,23 @@ public class HealthConnectService : IHealthDataService
     public async Task<bool> RequestPermissionsAsync()
     {
         if (GetAvailability() != HealthDataAvailability.Available) return false;
-        var contract = new HealthPermissionsRequestContract();
-        var intent = contract.CreateIntentImpl(Context, new HashSet<string>(Permissions));
-        var (resultCode, data) = await ActivityResultBridge.StartAsync(intent);
-        var granted = contract.ParseResultImpl((int)resultCode, data);
-        Logger.LogInformation("Health Connect permission request finished; granted {Count}", granted.Count);
+        var route = HealthPermissionRequest.ChooseRoute((int)global::Android.OS.Build.VERSION.SdkInt);
+        if (route == HealthPermissionRequest.Route.PlatformRuntimePermissions)
+        {
+            // Android 14+: Health Connect permissions are platform runtime permissions.
+            var (names, results) = await ActivityResultBridge.RequestPermissionsAsync(Permissions);
+            var granted = HealthPermissionRequest.GrantedFromResults(names, results);
+            Logger.LogInformation("Health Connect permission dialog finished; granted {Count}", granted.Count);
+        }
+        else
+        {
+            // Android 13 and below: the contract's intent opens the Health Connect app.
+            var contract = new HealthPermissionsRequestContract();
+            var intent = contract.CreateIntentImpl(Context, new HashSet<string>(Permissions));
+            var (resultCode, data) = await ActivityResultBridge.StartAsync(intent);
+            var granted = contract.ParseResultImpl((int)resultCode, data);
+            Logger.LogInformation("Health Connect permission request finished; granted {Count}", granted.Count);
+        }
         return await HasPermissionsAsync();
     }
 

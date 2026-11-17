@@ -25,6 +25,7 @@
     <Compile Include="..\..\Services\DriveExportDestination.cs" Link="App\DriveExportDestination.cs" />
     <Compile Include="..\..\Services\NightlySchedule.cs" Link="App\NightlySchedule.cs" />
     <Compile Include="..\..\Services\ErrorLog.cs" Link="App\ErrorLog.cs" />
+    <Compile Include="..\..\Services\HealthPermissionRequest.cs" Link="App\HealthPermissionRequest.cs" />
   </ItemGroup>
 
   <ItemGroup>
