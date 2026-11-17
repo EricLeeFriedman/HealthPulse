@@ -134,6 +134,7 @@ public class ExportTests
         public bool HasDestination => true;
         public string? DestinationName => "test.json";
         public Task<bool> ChooseDestinationAsync(string suggestedFileName) => Task.FromResult(true);
+        public void Disconnect() { }
         public Task WriteAsync(string content)
         {
             if (FailNext)
