@@ -54,11 +54,15 @@ public class WeatherService
     /// <summary>Rounds to 2 decimals (about 1 km) so the stored and sent location stays coarse.</summary>
     public static double Coarse(double degrees) => Math.Round(degrees, 2);
 
-    public static string BuildUrl(string baseUrl, double latitude, double longitude, int pastDays) =>
-        string.Create(CultureInfo.InvariantCulture,
-            $"{baseUrl}?latitude={Coarse(latitude):0.##}&longitude={Coarse(longitude):0.##}" +
+    public static string BuildUrl(string baseUrl, double latitude, double longitude, int pastDays)
+    {
+        var lat = Coarse(latitude).ToString("0.##", CultureInfo.InvariantCulture);
+        var lon = Coarse(longitude).ToString("0.##", CultureInfo.InvariantCulture);
+        var past = Math.Clamp(pastDays, 1, MaxPastDays).ToString(CultureInfo.InvariantCulture);
+        return $"{baseUrl}?latitude={lat}&longitude={lon}" +
             "&hourly=pressure_msl,temperature_2m,relative_humidity_2m" +
-            $"&temperature_unit=fahrenheit&timezone=auto&past_days={Math.Clamp(pastDays, 1, MaxPastDays)}&forecast_days=1");
+            $"&temperature_unit=fahrenheit&timezone=auto&past_days={past}&forecast_days=1";
+    }
 
     public static List<HourlyWeather> ParseHourly(string json)
     {
