@@ -16,6 +16,9 @@ public interface IHealthDataService
     Task<bool> RequestPermissionsAsync();
     /// <summary>Returns one summary per date from <paramref name="from"/> to <paramref name="to"/>, inclusive.</summary>
     Task<List<DailyHealthSummary>> GetDailySummariesAsync(DateOnly from, DateOnly to);
+
+    /// <summary>How each step of the last read went (time taken, errors), for the export.</summary>
+    IReadOnlyList<string> LastReadSteps => [];
 }
 
 /// <summary>Used on platforms without Health Connect (the Windows dev target).</summary>

@@ -1,66 +1,54 @@
 using Android.Runtime;
 using Kotlin.Coroutines;
+using Kotlin.Jvm.Functions;
+using Xamarin.KotlinX.Coroutines;
 
 namespace HealthPulse.Platforms.Android;
 
 /// <summary>
-/// Bridges Kotlin suspend functions (exposed to C# as methods that take an
-/// IContinuation) to .NET tasks.
+/// Runs Kotlin suspend functions (exposed to C# as methods that take an
+/// IContinuation) and returns their result as a .NET task.
 /// </summary>
+/// <remarks>
+/// Each call runs inside kotlinx runBlocking on its own background thread, so it
+/// gets a real coroutine (a Job and an event loop) rather than a bare
+/// continuation, and inside withTimeout, so a Health Connect call that never
+/// answers is cancelled instead of hanging the app.
+/// </remarks>
 public static class KotlinTask
 {
     /// <summary>How long one Health Connect call may take before it counts as stuck.</summary>
-    public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(25);
 
-    public static async Task<Java.Lang.Object?> AwaitAsync(Func<IContinuation, Java.Lang.Object?> call,
+    public static Task<Java.Lang.Object?> AwaitAsync(Func<IContinuation, Java.Lang.Object?> call,
         TimeSpan? timeout = null)
     {
-        var continuation = new TaskContinuation();
-        var immediate = call(continuation);
-        if (IsSuspended(immediate))
-            return await HealthPulse.Services.Timeouts.Limit(continuation.Task, timeout ?? DefaultTimeout, "A Health Connect call");
-        return Unwrap(immediate);
-    }
-
-    static bool IsSuspended(Java.Lang.Object? value) =>
-        value != null
-        && value.Class.Name == "kotlin.coroutines.intrinsics.CoroutineSingletons"
-        && value.ToString() == "COROUTINE_SUSPENDED";
-
-    static Java.Lang.Object? Unwrap(Java.Lang.Object? value)
-    {
-        // Kotlin delivers failures as an internal kotlin.Result$Failure wrapper.
-        if (value != null && value.Class.Name == "kotlin.Result$Failure")
+        var limit = timeout ?? DefaultTimeout;
+        var work = Task.Factory.StartNew(() =>
         {
-            var field = value.Class.GetDeclaredField("exception");
-            field.Accessible = true;
-            var throwable = field.Get(value);
-            if (throwable != null)
-                throw throwable.JavaCast<Java.Lang.Throwable>();
-            throw new InvalidOperationException("Health Connect call failed.");
-        }
-        return value;
-    }
-
-    sealed class TaskContinuation : Java.Lang.Object, IContinuation
-    {
-        readonly TaskCompletionSource<Java.Lang.Object?> completion =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public Task<Java.Lang.Object?> Task => completion.Task;
-
-        public ICoroutineContext Context => EmptyCoroutineContext.Instance;
-
-        public void ResumeWith(Java.Lang.Object result)
-        {
+            var inner = new SuspendBlock((_, continuation) => call(continuation));
+            var withTimeout = new SuspendBlock((_, continuation) =>
+                TimeoutKt.WithTimeout((long)limit.TotalMilliseconds, inner, continuation));
             try
             {
-                completion.TrySetResult(Unwrap(result));
+                return BuildersKt.RunBlocking(EmptyCoroutineContext.Instance, withTimeout);
             }
-            catch (Exception exception)
+            catch (Java.Lang.Throwable throwable) when (throwable.Class.Name.EndsWith("TimeoutCancellationException"))
             {
-                completion.TrySetException(exception);
+                throw new TimeoutException(
+                    $"Health Connect didn't answer within {HealthPulse.Services.Timeouts.Describe(limit)}.");
             }
-        }
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+
+        // Backstop in case the coroutine ignores cancellation.
+        return HealthPulse.Services.Timeouts.Limit(work, limit + TimeSpan.FromSeconds(5), "A Health Connect call");
+    }
+
+    /// <summary>A Kotlin suspend lambda: (receiver, continuation) → result or COROUTINE_SUSPENDED.</summary>
+    sealed class SuspendBlock(Func<Java.Lang.Object?, IContinuation, Java.Lang.Object?> body)
+        : Java.Lang.Object, IFunction2
+    {
+        public Java.Lang.Object? Invoke(Java.Lang.Object? receiver, Java.Lang.Object? continuation) =>
+            body(receiver, continuation!.JavaCast<IContinuation>());
     }
 }

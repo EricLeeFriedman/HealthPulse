@@ -28,7 +28,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<ITrackerStore>(services =>
             new LocalTrackerStore(dbPath, services.GetRequiredService<ILogger<LocalTrackerStore>>()));
 #if ANDROID
-        builder.Services.AddSingleton<IHealthDataService, Platforms.Android.HealthConnectService>();
+        builder.Services.AddSingleton<Platforms.Android.HealthConnectService>();
+        builder.Services.AddSingleton<IHealthDataService>(services =>
+            new SharedHealthData(services.GetRequiredService<Platforms.Android.HealthConnectService>()));
         builder.Services.AddSingleton<IGoogleAuth, Platforms.Android.GoogleAuthService>();
         builder.Services.AddSingleton<ILocationProvider, Platforms.Android.AndroidLocationProvider>();
 #else

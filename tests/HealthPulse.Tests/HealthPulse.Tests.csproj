@@ -35,6 +35,8 @@
     <Compile Include="..\..\Services\WorkoutImporter.cs" Link="App\WorkoutImporter.cs" />
     <Compile Include="..\..\Services\FoodLog.cs" Link="App\FoodLog.cs" />
     <Compile Include="..\..\Services\Timeouts.cs" Link="App\Timeouts.cs" />
+    <Compile Include="..\..\Services\HealthReadReport.cs" Link="App\HealthReadReport.cs" />
+    <Compile Include="..\..\Services\SharedHealthData.cs" Link="App\SharedHealthData.cs" />
   </ItemGroup>
 
   <ItemGroup>

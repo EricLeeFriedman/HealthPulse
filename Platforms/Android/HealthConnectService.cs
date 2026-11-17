@@ -99,6 +99,13 @@ public class HealthConnectService : IHealthDataService
         return await HasPermissionsAsync();
     }
 
+    /// <summary>Total time one read may take; steps after that are skipped and the rest is returned.</summary>
+    public static readonly TimeSpan ReadBudget = TimeSpan.FromSeconds(75);
+
+    HealthReadReport? lastReport;
+
+    public IReadOnlyList<string> LastReadSteps => lastReport?.Steps ?? [];
+
     public async Task<List<DailyHealthSummary>> GetDailySummariesAsync(DateOnly from, DateOnly to)
     {
         var summaries = HealthSummaryBuilder.CreateDays(from, to);
@@ -106,33 +113,28 @@ public class HealthConnectService : IHealthDataService
         if (GetAvailability() != HealthDataAvailability.Available)
             return summaries.Values.ToList();
 
-        var granted = await GetGrantedPermissionsAsync();
+        var report = new HealthReadReport(ReadBudget);
+        lastReport = report;
+        report.Note($"read {from:yyyy-MM-dd} to {to:yyyy-MM-dd}");
+        var granted = new HashSet<string>();
+        await report.RunAsync("permissions", async () => granted = await GetGrantedPermissionsAsync());
         var start = from.ToDateTime(TimeOnly.MinValue);
         var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
 
-        await Try("aggregates", () => ReadDailyAggregatesAsync(granted, start, end, summaries));
+        // Most useful first, so a slow phone still exports sleep and steps.
         if (granted.Contains(ReadSleep))
-            await Try("sleep", () => ReadSleepAsync(start, end, summaries));
-        if (granted.Contains(ReadHrv))
-            await Try("hrv", () => ReadHrvAsync(start, end, summaries));
+            await report.RunAsync("sleep", () => ReadSleepAsync(start, end, summaries));
+        await report.RunAsync("steps and heart rate", () => ReadDailyAggregatesAsync(granted, start, end, summaries));
         if (granted.Contains(ReadExercise))
-            await Try("exercise", () => ReadExerciseAsync(granted, start, end, summaries));
+            await report.RunAsync("exercise", () => ReadExerciseAsync(granted, start, end, summaries, report));
+        if (granted.Contains(ReadHrv))
+            await report.RunAsync("hrv", () => ReadHrvAsync(start, end, summaries));
         if (granted.Contains(ReadWeight))
-            await Try("weight", () => ReadWeightAsync(start, end, summaries));
+            await report.RunAsync("weight", () => ReadWeightAsync(start, end, summaries));
 
+        foreach (var step in report.Steps)
+            Logger.LogInformation("Health Connect {Step}", step);
         return summaries.Values.OrderBy(s => s.Date).ToList();
-    }
-
-    async Task Try(string what, Func<Task> read)
-    {
-        try
-        {
-            await read();
-        }
-        catch (Exception exception)
-        {
-            Logger.LogError(exception, "Health Connect read failed: {What}", what);
-        }
     }
 
     // ---------------------------------------------------------------------
@@ -207,22 +209,43 @@ public class HealthConnectService : IHealthDataService
     }
 
     /// <summary>Per-session heart rate and distance are only looked up for recent sessions, to keep reads fast.</summary>
-    static readonly TimeSpan SessionDetailWindow = TimeSpan.FromDays(21);
+    static readonly TimeSpan SessionDetailWindow = TimeSpan.FromDays(14);
+    const int MaxSessionDetails = 12;
 
     async Task ReadExerciseAsync(HashSet<string> granted, DateTime start, DateTime end,
-        Dictionary<DateOnly, DailyHealthSummary> summaries)
+        Dictionary<DateOnly, DailyHealthSummary> summaries, HealthReadReport report)
     {
         var records = await ReadAllAsync<ExerciseSessionRecord>(start, end);
         var detailSince = DateTime.Now - SessionDetailWindow;
+        var recent = new List<(ExerciseSessionRecord Record, ExerciseSummary Summary)>();
         foreach (var record in records)
         {
             var sessionStart = ToLocal(record.StartTime);
             var sessionEnd = ToLocal(record.EndTime);
             var summary = HealthSummaryBuilder.AddExercise(summaries, ExerciseName(record.ExerciseType), record.Title,
                 sessionStart, sessionEnd, record.Metadata.Id);
-            if (summary == null || sessionStart < detailSince || summary.Minutes < 5) continue;
-            await Try("exercise details", () => ReadSessionDetailsAsync(granted, record, summary));
+            if (summary != null && sessionStart >= detailSince && summary.Minutes >= 5)
+                recent.Add((record, summary));
         }
+        report.Note($"exercise: {records.Count} sessions");
+
+        // Newest first; stop when the read is out of time or a lookup hangs.
+        int done = 0, failed = 0;
+        foreach (var (record, summary) in recent.OrderByDescending(r => r.Summary.Start).Take(MaxSessionDetails))
+        {
+            if (report.OutOfTime || failed >= 2) break;
+            try
+            {
+                await ReadSessionDetailsAsync(granted, record, summary);
+                done++;
+            }
+            catch (Exception exception)
+            {
+                failed++;
+                report.Note($"workout heart rate/distance failed ({exception.GetType().Name}: {exception.Message})");
+            }
+        }
+        report.Note($"workout heart rate/distance: {done} of {recent.Count} recent sessions");
     }
 
     async Task ReadSessionDetailsAsync(HashSet<string> granted, ExerciseSessionRecord record, ExerciseSummary summary)
