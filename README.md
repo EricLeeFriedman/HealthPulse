@@ -4,7 +4,10 @@ A personal Android app (.NET MAUI) that:
 
 1. **Logs migraines**: start/end, peak pain 0–10, aura and symptoms, triptan taken plus time and 2-hour relief, other meds, possible triggers, notes. A one-tap "Took triptan now" / "It's over" card covers attacks in progress.
 2. **Reads Android Health Connect**: sleep, steps, heart rate (avg/min/max), resting heart rate, HRV (RMSSD), exercise sessions, weight. Pixel Watch data comes in through the Fitbit app's Health Connect sync.
-3. **Exports to Google Drive**: after you tap **Sign in with Google**, the app writes the last 90 days to `My Drive/HealthPulse/healthpulse-export.json` every night at 11:45 PM, when you open it (at most every 3 hours), after each migraine change, or when you tap "Export now". Recent app errors are included in the export so problems can be diagnosed remotely.
+3. **Daily check-in** (Today tab): caffeine cups and time of the last one, water, first meal time, alcohol, stress 1 to 5, the four migraine supplements, a protein estimate against the 120 to 150 g target, and the Sunday mobility checkbox. Shows today's planned session and barometric pressure.
+4. **Fitness** tab: logs workouts against the 12-week plan (Mon Strength A, Tue Run, Wed Strength B, Thu Run, Fri Strength C, Sat off, Sun mobility) with sets, reps and weights prefilled from last time, counts sessions done out of 6 each week, and logs weekly waist and weight, monthly progress photos (kept on the phone only) and the monthly toe-touch, push-up and plank test.
+5. **Weather**: hourly sea-level pressure, temperature and humidity from [Open-Meteo](https://open-meteo.com) (free, no key) for the phone's city-level location, summarized per day with the day-over-day change and the biggest 6-hour drop.
+6. **Exports to Google Drive**: after you tap **Sign in with Google**, the app writes the last 90 days to `My Drive/HealthPulse/healthpulse-export.json` every night at 11:45 PM, when you open it (at most every 3 hours), after each migraine change, or when you tap "Export now". Recent app errors are included in the export so problems can be diagnosed remotely.
 
 No health data is stored in this repository. Everything stays on the phone and in your Drive file.
 
@@ -30,10 +33,10 @@ Google sign-in needs an OAuth client in a Google Cloud project owned by the Driv
 
 ## Export format
 
-`healthpulse-export.json` has a `days` array (one row per date: sleep, steps, heart rate, HRV, exercise, weight, whether a migraine happened and its peak pain) and a `migraines` array with every logged attack. Times are local.
+`healthpulse-export.json` has a `days` array (one row per date: sleep, steps, heart rate, HRV, exercise, weight, whether a migraine happened and its peak pain, the planned and logged sessions, the `checkIn`, `weather` and any waist or weight logged), a `weeks` array (sessions done out of 6), and `migraines`, `workouts` (with sets), `measurements` (photo counts only) and `fitnessTests` arrays. Times are local.
 
 ## Development
 
 - App: `HealthPulse.csproj` (net10.0-android, min Android 8.0).
-- Tests: `dotnet test tests/HealthPulse.Tests` runs the platform-neutral code (migraine storage, export) without MAUI.
+- Tests: `dotnet test tests/HealthPulse.Tests` runs the platform-neutral code (storage, workout plan, check-in rules, weather parsing, export) without MAUI.
 - Health Connect code lives in `Platforms/Android/`.

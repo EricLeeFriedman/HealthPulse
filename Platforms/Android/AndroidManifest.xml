@@ -3,10 +3,19 @@
 	<application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true" android:label="HealthPulse"></application>
 	<queries>
 		<package android:name="com.google.android.apps.healthdata" />
+		<intent>
+			<action android:name="android.media.action.IMAGE_CAPTURE" />
+		</intent>
 	</queries>
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+	<!-- City-level location for barometric pressure. -->
+	<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+	<!-- Optional monthly progress photos (kept on the phone). -->
+	<uses-permission android:name="android.permission.CAMERA" />
+	<uses-feature android:name="android.hardware.camera" android:required="false" />
+	<uses-feature android:name="android.hardware.location" android:required="false" />
 	<uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 	<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
 	<uses-permission android:name="android.permission.health.READ_STEPS" />

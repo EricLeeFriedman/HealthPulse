@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:HealthPulse.ViewModels"
+             x:Class="HealthPulse.Views.WorkoutEditPage"
+             x:DataType="vm:WorkoutEditViewModel"
+             Title="{Binding PageTitle}"
+             BackgroundColor="#F3F4F6">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="12" Padding="16,12,16,24">
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Session" Style="{StaticResource CardTitle}" />
+                    <Picker ItemsSource="{Binding SessionTypes}" SelectedIndex="{Binding TypeIndex}" Title="Session type" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <DatePicker Date="{Binding Date}" Format="ddd MMM d" />
+                        <TimePicker Grid.Column="1" Time="{Binding Clock}" />
+                    </Grid>
+                    <Label Text="{Binding TargetText}" Style="{StaticResource Muted}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <Entry Text="{Binding Duration}" Keyboard="Numeric" Placeholder="Minutes" />
+                        <Entry Grid.Column="1" Text="{Binding Distance}" Keyboard="Numeric" Placeholder="Miles" IsVisible="{Binding IsRun}" />
+                    </Grid>
+                    <Label Text="{Binding MobilityText}" FontSize="14" TextColor="#374151" IsVisible="{Binding IsMobility}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <VerticalStackLayout Spacing="12" BindableLayout.ItemsSource="{Binding Exercises}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ExerciseLog">
+                        <Border Style="{StaticResource Card}">
+                            <VerticalStackLayout Spacing="6">
+                                <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="#0F766E" />
+                                <Label Text="{Binding Unit}" Style="{StaticResource Muted}" />
+                                <Label Text="{Binding Hint}" Style="{StaticResource Muted}" IsVisible="{Binding HasHint}" />
+                                <VerticalStackLayout Spacing="4" BindableLayout.ItemsSource="{Binding Sets}">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SetLog">
+                                            <Grid ColumnDefinitions="60,*,*" ColumnSpacing="8">
+                                                <Label Text="{Binding Label}" VerticalOptions="Center" />
+                                                <Entry Grid.Column="1" Text="{Binding Amount}" Keyboard="Numeric" Placeholder="{Binding AmountPlaceholder}" />
+                                                <Entry Grid.Column="2" Text="{Binding Weight}" Keyboard="Numeric" Placeholder="lb" IsVisible="{Binding Weighted}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                    <Button Text="+ Set" Style="{StaticResource SecondaryButton}" Command="{Binding AddSetCommand}" />
+                                    <Button Grid.Column="1" Text="− Set" Style="{StaticResource SecondaryButton}" Command="{Binding RemoveSetCommand}" />
+                                </Grid>
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Add another exercise" Style="{StaticResource Muted}" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <Entry Text="{Binding NewExercise}" Placeholder="Exercise name" />
+                        <Button Grid.Column="1" Text="Add" Style="{StaticResource SecondaryButton}" Command="{Binding AddExerciseCommand}" />
+                    </Grid>
+                    <Entry Text="{Binding Notes}" Placeholder="Notes (how it felt, back OK?)" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Button Text="Save workout" Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}" />
+            <Button Text="Delete workout" Style="{StaticResource SecondaryButton}" TextColor="#B91C1C"
+                    Command="{Binding DeleteCommand}" IsVisible="{Binding IsExisting}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -11,8 +11,12 @@
        Shell.TabBarTitleColor="#0F766E"
        Shell.TabBarUnselectedColor="#6B7280">
     <TabBar>
+        <ShellContent Title="Today" Route="today"
+                      ContentTemplate="{DataTemplate views:TodayPage}" />
         <ShellContent Title="Migraines" Route="migraines"
                       ContentTemplate="{DataTemplate views:MigrainesPage}" />
+        <ShellContent Title="Fitness" Route="fitness"
+                      ContentTemplate="{DataTemplate views:FitnessPage}" />
         <ShellContent Title="Health" Route="health"
                       ContentTemplate="{DataTemplate views:HealthPage}" />
     </TabBar>

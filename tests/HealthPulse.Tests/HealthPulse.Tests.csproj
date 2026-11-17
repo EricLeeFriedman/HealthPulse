@@ -26,6 +26,12 @@
     <Compile Include="..\..\Services\NightlySchedule.cs" Link="App\NightlySchedule.cs" />
     <Compile Include="..\..\Services\ErrorLog.cs" Link="App\ErrorLog.cs" />
     <Compile Include="..\..\Services\HealthPermissionRequest.cs" Link="App\HealthPermissionRequest.cs" />
+    <Compile Include="..\..\Models\TrackerModels.cs" Link="App\TrackerModels.cs" />
+    <Compile Include="..\..\Services\WorkoutPlan.cs" Link="App\WorkoutPlan.cs" />
+    <Compile Include="..\..\Services\TrackerRules.cs" Link="App\TrackerRules.cs" />
+    <Compile Include="..\..\Services\TrackerStore.cs" Link="App\TrackerStore.cs" />
+    <Compile Include="..\..\Services\WeatherService.cs" Link="App\WeatherService.cs" />
+    <Compile Include="..\..\Services\WorkoutForm.cs" Link="App\WorkoutForm.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:HealthPulse.ViewModels"
+             x:Class="HealthPulse.Views.TodayPage"
+             x:DataType="vm:TodayViewModel"
+             Title="Today"
+             BackgroundColor="#F3F4F6">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="12" Padding="16,12,16,24">
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Daily check-in" Style="{StaticResource CardTitle}" VerticalOptions="Center" />
+                        <DatePicker Grid.Column="1" Date="{Binding Date}" Format="ddd MMM d" />
+                    </Grid>
+                    <Label Text="{Binding PlanText}" FontSize="14" FontAttributes="Bold" TextColor="#0F766E" />
+                    <Label Text="{Binding TargetText}" Style="{StaticResource Muted}" />
+                    <Label Text="{Binding WeatherText}" FontSize="14" TextColor="#374151" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Caffeine and food" Style="{StaticResource CardTitle}" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Label Text="{Binding CaffeineText}" VerticalOptions="Center" FontSize="15" />
+                        <Stepper Grid.Column="1" Minimum="0" Maximum="20" Increment="1" Value="{Binding CaffeineCups}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <CheckBox IsChecked="{Binding HasLastCaffeine}" Color="#0F766E" />
+                        <Label Grid.Column="1" Text="Last caffeine at" VerticalOptions="Center" />
+                        <TimePicker Grid.Column="2" Time="{Binding LastCaffeineTime}" IsEnabled="{Binding HasLastCaffeine}" />
+                    </Grid>
+                    <Button Text="☕  Had a coffee just now" Style="{StaticResource SecondaryButton}" Command="{Binding CaffeineNowCommand}" />
+
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Margin="0,6,0,0">
+                        <CheckBox IsChecked="{Binding HasFirstMeal}" Color="#0F766E" />
+                        <Label Grid.Column="1" Text="First meal at" VerticalOptions="Center" />
+                        <TimePicker Grid.Column="2" Time="{Binding FirstMealTime}" IsEnabled="{Binding HasFirstMeal}" />
+                    </Grid>
+                    <Button Text="🍳  Ate my first meal just now" Style="{StaticResource SecondaryButton}" Command="{Binding MealNowCommand}" />
+
+                    <Label Text="Protein estimate (grams)" Style="{StaticResource Muted}" Margin="0,6,0,0" />
+                    <Grid ColumnDefinitions="100,*" ColumnSpacing="10">
+                        <Entry Text="{Binding ProteinGrams}" Keyboard="Numeric" Placeholder="e.g. 130" />
+                        <Label Grid.Column="1" Text="{Binding ProteinStatusText}" VerticalOptions="Center" Style="{StaticResource Muted}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Water, alcohol, stress" Style="{StaticResource CardTitle}" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Label Text="{Binding WaterText}" VerticalOptions="Center" FontSize="15" />
+                        <Stepper Grid.Column="1" Minimum="0" Maximum="30" Increment="1" Value="{Binding WaterGlasses}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Label Text="{Binding AlcoholText}" VerticalOptions="Center" FontSize="15" />
+                        <Stepper Grid.Column="1" Minimum="0" Maximum="20" Increment="1" Value="{Binding AlcoholDrinks}" />
+                    </Grid>
+                    <Label Text="Stress today" Style="{StaticResource Muted}" />
+                    <Picker ItemsSource="{Binding StressOptions}" SelectedIndex="{Binding StressIndex}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Supplements" Style="{StaticResource CardTitle}" VerticalOptions="Center" />
+                        <Button Grid.Column="1" Text="All taken" Style="{StaticResource SecondaryButton}" Command="{Binding AllSupplementsCommand}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="4">
+                        <CheckBox IsChecked="{Binding Riboflavin}" Color="#0F766E" />
+                        <Label Grid.Column="1" Text="Riboflavin" VerticalOptions="Center" />
+                        <CheckBox Grid.Column="2" IsChecked="{Binding BComplex}" Color="#0F766E" />
+                        <Label Grid.Column="3" Text="B complex" VerticalOptions="Center" />
+                        <CheckBox Grid.Row="1" IsChecked="{Binding CoQ10}" Color="#0F766E" />
+                        <Label Grid.Row="1" Grid.Column="1" Text="CoQ10" VerticalOptions="Center" />
+                        <CheckBox Grid.Row="1" Grid.Column="2" IsChecked="{Binding Magnesium}" Color="#0F766E" />
+                        <Label Grid.Row="1" Grid.Column="3" Text="Magnesium" VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="6">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <CheckBox IsChecked="{Binding MobilityDone}" Color="#0F766E" />
+                        <Label Grid.Column="1" Text="{Binding MobilityLabel}" VerticalOptions="Center" FontSize="15" />
+                    </Grid>
+                    <Entry Text="{Binding Notes}" Placeholder="Notes (optional)" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Button Text="Save check-in" Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}" />
+            <Label Text="{Binding SavedText}" Style="{StaticResource Muted}" HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

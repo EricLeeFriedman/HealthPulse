@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:HealthPulse.ViewModels"
+             xmlns:models="clr-namespace:HealthPulse.Models"
+             x:Class="HealthPulse.Views.FitnessPage"
+             x:DataType="vm:FitnessViewModel"
+             Title="Fitness"
+             BackgroundColor="#F3F4F6">
+
+    <CollectionView ItemsSource="{Binding Workouts}" SelectionMode="None" Margin="16,0">
+        <CollectionView.Header>
+            <VerticalStackLayout Spacing="12" Padding="0,12,0,8">
+
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="This week" Style="{StaticResource CardTitle}" />
+                        <Label Text="{Binding WeekText}" FontSize="14" TextColor="#374151" />
+                        <Label Text="{Binding TodayText}" FontSize="14" FontAttributes="Bold" TextColor="#0F766E" />
+                        <Label Text="{Binding TargetText}" Style="{StaticResource Muted}" />
+                        <Button Text="🏋  Log a workout" Style="{StaticResource PrimaryButton}" Command="{Binding LogWorkoutCommand}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Body and flexibility" Style="{StaticResource CardTitle}" />
+                        <Label Text="{Binding BodyText}" FontSize="14" TextColor="#374151" />
+                        <Label Text="{Binding BodyDueText}" Style="{StaticResource Muted}" />
+                        <Label Text="{Binding TestText}" FontSize="14" TextColor="#374151" />
+                        <Label Text="{Binding TestDueText}" Style="{StaticResource Muted}" />
+                        <Button Text="📏  Log waist, weight, photos or test" Style="{StaticResource SecondaryButton}" Command="{Binding MeasureCommand}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label Text="Recent workouts" Style="{StaticResource CardTitle}" />
+            </VerticalStackLayout>
+        </CollectionView.Header>
+
+        <CollectionView.EmptyView>
+            <Label Text="No workouts logged yet." Style="{StaticResource Muted}" Margin="0,8" />
+        </CollectionView.EmptyView>
+
+        <CollectionView.ItemTemplate>
+            <DataTemplate x:DataType="models:WorkoutSession">
+                <Border Style="{StaticResource Card}" Padding="14,12" Margin="0,0,0,10">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:FitnessViewModel}}, Path=OpenWorkoutCommand, x:DataType=vm:FitnessViewModel}"
+                                              CommandParameter="{Binding .}" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="{Binding DisplayDate}" FontSize="15" FontAttributes="Bold" TextColor="#0F766E" />
+                        <Label Text="{Binding Summary}" FontSize="14" TextColor="#374151" />
+                    </VerticalStackLayout>
+                </Border>
+            </DataTemplate>
+        </CollectionView.ItemTemplate>
+    </CollectionView>
+</ContentPage>
