@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- The platform-neutral app code, compiled directly so tests run without MAUI. -->
+  <ItemGroup>
+    <Compile Include="..\..\Models\MigraineEntry.cs" Link="App\MigraineEntry.cs" />
+    <Compile Include="..\..\Models\DailyHealthSummary.cs" Link="App\DailyHealthSummary.cs" />
+    <Compile Include="..\..\Services\IMigraineService.cs" Link="App\IMigraineService.cs" />
+    <Compile Include="..\..\Services\LocalMigraineService.cs" Link="App\LocalMigraineService.cs" />
+    <Compile Include="..\..\Services\IHealthDataService.cs" Link="App\IHealthDataService.cs" />
+    <Compile Include="..\..\Services\IExportDestination.cs" Link="App\IExportDestination.cs" />
+    <Compile Include="..\..\Services\ISettingsStore.cs" Link="App\ISettingsStore.cs" />
+    <Compile Include="..\..\Services\HealthExportService.cs" Link="App\HealthExportService.cs" />
+    <Compile Include="..\..\Services\HealthSummaryBuilder.cs" Link="App\HealthSummaryBuilder.cs" />
+    <Compile Include="..\..\Services\MigraineStats.cs" Link="App\MigraineStats.cs" />
+    <Compile Include="..\..\Services\MigraineForm.cs" Link="App\MigraineForm.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
+    <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

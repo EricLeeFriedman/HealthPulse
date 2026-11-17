@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:HealthPulse.ViewModels"
+             x:Class="HealthPulse.Views.MigraineEditPage"
+             x:DataType="vm:MigraineEditViewModel"
+             Title="{Binding PageTitle}"
+             BackgroundColor="#F3F4F6">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="12" Padding="16,12,16,24">
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="When" Style="{StaticResource CardTitle}" />
+                    <Label Text="Started" Style="{StaticResource Muted}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <DatePicker Date="{Binding StartDate}" Format="ddd MMM d" />
+                        <TimePicker Grid.Column="1" Time="{Binding StartClock}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Still going" VerticalOptions="Center" FontSize="15" />
+                        <Switch Grid.Column="1" IsToggled="{Binding IsOngoing}" OnColor="#5EEAD4" ThumbColor="#0F766E" />
+                    </Grid>
+                    <VerticalStackLayout Spacing="8" IsVisible="{Binding HasEnded}">
+                        <Label Text="Ended" Style="{StaticResource Muted}" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <DatePicker Date="{Binding EndDate}" Format="ddd MMM d" />
+                            <TimePicker Grid.Column="1" Time="{Binding EndClock}" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="{Binding SeverityText}" Style="{StaticResource CardTitle}" />
+                    <Slider Minimum="0" Maximum="10" Value="{Binding Severity}"
+                            MinimumTrackColor="#0F766E" ThumbColor="#0F766E" />
+                    <Label Text="Symptoms" Style="{StaticResource Muted}" Margin="0,6,0,0" />
+                    <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="4">
+                        <CheckBox IsChecked="{Binding Aura}" Color="#0F766E" />
+                        <Label Grid.Column="1" Text="Aura" VerticalOptions="Center" />
+                        <CheckBox Grid.Column="2" IsChecked="{Binding Nausea}" Color="#0F766E" />
+                        <Label Grid.Column="3" Text="Nausea" VerticalOptions="Center" />
+                        <CheckBox Grid.Row="1" IsChecked="{Binding LightSensitivity}" Color="#0F766E" />
+                        <Label Grid.Row="1" Grid.Column="1" Text="Light sensitive" VerticalOptions="Center" />
+                        <CheckBox Grid.Row="1" Grid.Column="2" IsChecked="{Binding SoundSensitivity}" Color="#0F766E" />
+                        <Label Grid.Row="1" Grid.Column="3" Text="Sound sensitive" VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Triptan taken" Style="{StaticResource CardTitle}" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding TriptanTaken}" OnColor="#5EEAD4" ThumbColor="#0F766E" />
+                    </Grid>
+                    <VerticalStackLayout Spacing="8" IsVisible="{Binding TriptanTaken}">
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <DatePicker Date="{Binding TriptanDate}" Format="ddd MMM d" />
+                            <TimePicker Grid.Column="1" Time="{Binding TriptanClock}" />
+                        </Grid>
+                        <Label Text="Relief after 2 hours" Style="{StaticResource Muted}" />
+                        <Picker ItemsSource="{Binding ReliefOptions}" SelectedIndex="{Binding ReliefIndex}" />
+                    </VerticalStackLayout>
+                    <Entry Text="{Binding OtherMeds}" Placeholder="Other meds (e.g. ibuprofen 400 mg)" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Possible triggers" Style="{StaticResource CardTitle}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Triggers}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TriggerOption">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <CheckBox IsChecked="{Binding IsSelected}" Color="#0F766E" />
+                                    <Label Grid.Column="1" Text="{Binding Name}" VerticalOptions="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                    <Editor Text="{Binding Notes}" Placeholder="Notes (food, caffeine, stress, weather…)"
+                            AutoSize="TextChanges" MinimumHeightRequest="90" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Button Text="Save" Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}" />
+            <Button Text="Delete entry" BackgroundColor="Transparent" TextColor="#B91C1C"
+                    Command="{Binding DeleteCommand}" IsVisible="{Binding IsExisting}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
