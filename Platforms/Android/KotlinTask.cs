@@ -1,3 +1,4 @@
+using Android.Runtime;
 using Kotlin.Coroutines;
 
 namespace HealthPulse.Platforms.Android;
@@ -29,8 +30,10 @@ public static class KotlinTask
         {
             var field = value.Class.GetDeclaredField("exception");
             field.Accessible = true;
-            var throwable = field.Get(value) as Java.Lang.Throwable;
-            throw throwable ?? new InvalidOperationException("Health Connect call failed.");
+            var throwable = field.Get(value);
+            if (throwable != null)
+                throw throwable.JavaCast<Java.Lang.Throwable>();
+            throw new InvalidOperationException("Health Connect call failed.");
         }
         return value;
     }

@@ -216,14 +216,12 @@ public class HealthConnectService : IHealthDataService
 
     async Task ReadExerciseAsync(DateTime start, DateTime end, Dictionary<DateOnly, DailyHealthSummary> summaries)
     {
-        var typeNames = ExerciseSessionRecord.ExerciseTypeIntToStringMap;
         var records = await ReadAllAsync<ExerciseSessionRecord>(start, end);
         foreach (var record in records)
         {
             var sessionStart = ToLocal(record.StartTime);
             if (!summaries.TryGetValue(DateOnly.FromDateTime(sessionStart), out var summary)) continue;
-            var typeName = typeNames[Java.Lang.Integer.ValueOf(record.ExerciseType)]?.ToString()
-                ?? record.ExerciseType.ToString();
+            var typeName = ExerciseTypeName(record.ExerciseType);
             summary.Exercise.Add(new ExerciseSummary
             {
                 Type = typeName,
@@ -233,6 +231,26 @@ public class HealthConnectService : IHealthDataService
             });
         }
     }
+
+    static string ExerciseTypeName(int type) => type switch
+    {
+        ExerciseSessionRecord.ExerciseTypeWalking => "walking",
+        ExerciseSessionRecord.ExerciseTypeRunning => "running",
+        ExerciseSessionRecord.ExerciseTypeBiking => "biking",
+        ExerciseSessionRecord.ExerciseTypeBikingStationary => "stationary_biking",
+        ExerciseSessionRecord.ExerciseTypeHiking => "hiking",
+        ExerciseSessionRecord.ExerciseTypeStrengthTraining => "strength_training",
+        ExerciseSessionRecord.ExerciseTypeWeightlifting => "weightlifting",
+        ExerciseSessionRecord.ExerciseTypeHighIntensityIntervalTraining => "hiit",
+        ExerciseSessionRecord.ExerciseTypeElliptical => "elliptical",
+        ExerciseSessionRecord.ExerciseTypeRowingMachine => "rowing_machine",
+        ExerciseSessionRecord.ExerciseTypeSwimmingPool => "swimming",
+        ExerciseSessionRecord.ExerciseTypeYoga => "yoga",
+        ExerciseSessionRecord.ExerciseTypePilates => "pilates",
+        ExerciseSessionRecord.ExerciseTypeCalisthenics => "calisthenics",
+        ExerciseSessionRecord.ExerciseTypeOtherWorkout => "other",
+        _ => $"type_{type}"
+    };
 
     async Task ReadWeightAsync(DateTime start, DateTime end, Dictionary<DateOnly, DailyHealthSummary> summaries)
     {
