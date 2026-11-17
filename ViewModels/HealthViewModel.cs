@@ -110,7 +110,7 @@ public partial class HealthViewModel : ObservableObject
 
     void RefreshErrors()
     {
-        var entries = Errors.Entries;
+        var entries = Errors.Recent(DateTime.Now);
         HasErrors = entries.Count > 0;
         ErrorText = string.Join("\n\n", entries.Take(3));
     }

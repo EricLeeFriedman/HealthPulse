@@ -43,6 +43,15 @@ public class ErrorLog
         }
     }
 
+    /// <summary>How long a problem stays on the Health tab and in the export.</summary>
+    public static readonly TimeSpan ShowFor = TimeSpan.FromDays(2);
+
+    /// <summary>Entries newer than <see cref="ShowFor"/>, so an old network blip ages out on its own.</summary>
+    public IReadOnlyList<string> Recent(DateTime now) =>
+        Entries.Where(entry => !DateTime.TryParseExact(entry.Length >= 19 ? entry[..19] : "", "yyyy-MM-dd HH:mm:ss",
+                System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var at)
+            || now - at < ShowFor).ToList();
+
     public void Clear()
     {
         lock (gate)

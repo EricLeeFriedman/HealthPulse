@@ -17,10 +17,37 @@ public class GoogleDriveClient
 
     readonly HttpClient http;
 
+    /// <summary>Waits before retrying after a dropped connection (no answer from Google at all).</summary>
+    public TimeSpan[] RetryDelays { get; set; } = [TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(6)];
+
     public GoogleDriveClient(HttpClient http)
     {
         this.http = http;
     }
+
+    /// <summary>
+    /// Sends a request, retrying when the connection fails before Google answers
+    /// (no signal, DNS not ready after waking). Errors Google returns are not retried here.
+    /// </summary>
+    async Task<HttpResponseMessage> SendAsync(Func<HttpRequestMessage> build)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            var request = build();
+            try
+            {
+                return await http.SendAsync(request);
+            }
+            catch (Exception exception) when (attempt < RetryDelays.Length && IsConnectionFailure(exception))
+            {
+                request.Dispose();
+                await Task.Delay(RetryDelays[attempt]);
+            }
+        }
+    }
+
+    public static bool IsConnectionFailure(Exception exception) =>
+        exception is HttpRequestException { StatusCode: null } || exception is IOException;
 
     public class DriveUnauthorizedException() : Exception("Google rejected the access token.");
 
@@ -48,7 +75,7 @@ public class GoogleDriveClient
     {
         var body = JsonSerializer.Serialize(new { name, mimeType = FolderMimeType, parents = new[] { "root" } });
         using var doc = await SendJsonAsync(HttpMethod.Post, $"{Api}/files?fields=id", token,
-            new StringContent(body, Encoding.UTF8, "application/json"));
+            () => new StringContent(body, Encoding.UTF8, "application/json"));
         return doc.RootElement.GetProperty("id").GetString()!;
     }
 
@@ -59,34 +86,41 @@ public class GoogleDriveClient
     {
         var boundary = "healthpulse" + Guid.NewGuid().ToString("N");
         var metadata = JsonSerializer.Serialize(new { name, parents = new[] { folderId }, mimeType });
-        var multipart = new MultipartContent("related", boundary)
-        {
-            new StringContent(metadata, Encoding.UTF8, "application/json"),
-            new StringContent(content, Encoding.UTF8, mimeType)
-        };
-        using var doc = await SendJsonAsync(HttpMethod.Post, $"{UploadApi}/files?uploadType=multipart&fields=id", token, multipart);
+        using var doc = await SendJsonAsync(HttpMethod.Post, $"{UploadApi}/files?uploadType=multipart&fields=id", token,
+            () => new MultipartContent("related", boundary)
+            {
+                new StringContent(metadata, Encoding.UTF8, "application/json"),
+                new StringContent(content, Encoding.UTF8, mimeType)
+            });
         return doc.RootElement.GetProperty("id").GetString()!;
     }
 
     /// <summary>Overwrites a file's contents. Returns false if the file no longer exists.</summary>
     public async Task<bool> UpdateFileAsync(string token, string fileId, string content, string mimeType)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Patch, $"{UploadApi}/files/{Uri.EscapeDataString(fileId)}?uploadType=media&fields=id")
+        using var response = await SendAsync(() =>
         {
-            Content = new StringContent(content, Encoding.UTF8, mimeType)
-        };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        using var response = await http.SendAsync(request);
+            var request = new HttpRequestMessage(HttpMethod.Patch,
+                $"{UploadApi}/files/{Uri.EscapeDataString(fileId)}?uploadType=media&fields=id")
+            {
+                Content = new StringContent(content, Encoding.UTF8, mimeType)
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            return request;
+        });
         if (response.StatusCode == HttpStatusCode.NotFound) return false;
         await EnsureSuccessAsync(response);
         return true;
     }
 
-    async Task<JsonDocument> SendJsonAsync(HttpMethod method, string url, string token, HttpContent? content = null)
+    async Task<JsonDocument> SendJsonAsync(HttpMethod method, string url, string token, Func<HttpContent>? content = null)
     {
-        using var request = new HttpRequestMessage(method, url) { Content = content };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        using var response = await http.SendAsync(request);
+        using var response = await SendAsync(() =>
+        {
+            var request = new HttpRequestMessage(method, url) { Content = content?.Invoke() };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            return request;
+        });
         await EnsureSuccessAsync(response);
         var json = await response.Content.ReadAsStringAsync();
         return JsonDocument.Parse(json);
