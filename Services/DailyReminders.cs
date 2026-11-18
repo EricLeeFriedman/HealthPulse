@@ -8,7 +8,7 @@ public record ReminderTask(string Key, string Text);
 
 /// <summary>
 /// Reminders at 9 AM, noon, 3, 6 and 9 PM listing what's still open today:
-/// preventives, the planned workout, the check-in, protein and the weekly
+/// preventives, the planned workout, the check-in and the weekly
 /// waist/weight. They stop for the day once everything is done, or when the
 /// user taps "Stop for today".
 /// </summary>
@@ -63,16 +63,10 @@ public static class DailyReminders
 
         var planned = WorkoutPlan.PlannedFor(date.DayOfWeek);
         if (planned != null && !WorkoutDone(planned, date, checkIn, workouts))
-            tasks.Add(new("workout", planned == WorkoutPlan.Mobility ? "Do your mobility routine" : $"Do today's workout: {planned}"));
+            tasks.Add(new("workout", planned == WorkoutPlan.Mobility ? "Do your mobility routine (steps on the Today tab)" : $"Do today's workout: {planned}"));
 
         if (!logged)
             tasks.Add(new("checkin", "Log today's check-in (caffeine, water, stress)"));
-
-        if (checkIn?.ProteinGrams is not { } protein || protein < TrackerRules.ProteinMinGrams)
-        {
-            var have = checkIn?.ProteinGrams is { } grams ? $" ({grams} g so far)" : "";
-            tasks.Add(new("protein", $"Reach {TrackerRules.ProteinMinGrams} g protein{have}"));
-        }
 
         if (TrackerRules.IsWeeklyMeasurementDue(lastMeasured, date))
             tasks.Add(new("measure", "Log weekly waist and weight"));

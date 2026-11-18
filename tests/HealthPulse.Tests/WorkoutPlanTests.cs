@@ -5,6 +5,15 @@ namespace HealthPulse.Tests;
 
 public class WorkoutPlanTests
 {
+    [Fact]
+    public void MobilityRoutineText_ListsEveryStepNumbered()
+    {
+        var lines = WorkoutPlan.MobilityRoutineText.Split('\n');
+        Assert.Equal(WorkoutPlan.MobilityRoutine.Length + 1, lines.Length);
+        Assert.Equal("1. Child's pose, 1 min", lines[1]);
+        Assert.StartsWith($"{WorkoutPlan.MobilityRoutine.Length}. ", lines[^1]);
+    }
+
     [Theory]
     [InlineData(DayOfWeek.Monday, "Strength A")]
     [InlineData(DayOfWeek.Tuesday, "Run")]

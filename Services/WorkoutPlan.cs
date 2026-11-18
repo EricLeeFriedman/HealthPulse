@@ -52,6 +52,11 @@ public static class WorkoutPlan
         "Figure-4 glute stretch, 45 s per side"
     ];
 
+    /// <summary>The routine as numbered steps, for the Today tab.</summary>
+    public static string MobilityRoutineText =>
+        "About 15 minutes, same routine every time. Move slowly and stay below pain.\n"
+        + string.Join("\n", MobilityRoutine.Select((step, i) => $"{i + 1}. {step}"));
+
     public static bool IsStrength(string sessionType) =>
         sessionType is StrengthA or StrengthB or StrengthC;
 
