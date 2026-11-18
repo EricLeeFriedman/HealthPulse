@@ -12,6 +12,23 @@ namespace HealthPulse
                                ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
     public class MainActivity : MauiAppCompatActivity
     {
+        const string PostNotifications = "android.permission.POST_NOTIFICATIONS";
+        const string AskedNotificationsKey = "asked_notifications";
+        const int NotificationsRequestCode = 7001;
+
+        protected override void OnCreate(Android.OS.Bundle? savedInstanceState)
+        {
+            base.OnCreate(savedInstanceState);
+            // Android 13+: reminders need notification permission. Ask once; the Today tab explains if it's off.
+            if (OperatingSystem.IsAndroidVersionAtLeast(33)
+                && CheckSelfPermission(PostNotifications) != Permission.Granted
+                && !Microsoft.Maui.Storage.Preferences.Default.Get(AskedNotificationsKey, false))
+            {
+                Microsoft.Maui.Storage.Preferences.Default.Set(AskedNotificationsKey, true);
+                RequestPermissions([PostNotifications], NotificationsRequestCode);
+            }
+        }
+
         protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
         {
             if (ActivityResultBridge.TryComplete(requestCode, resultCode, data))

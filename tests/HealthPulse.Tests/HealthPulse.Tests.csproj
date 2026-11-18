@@ -38,6 +38,7 @@
     <Compile Include="..\..\Services\HealthReadReport.cs" Link="App\HealthReadReport.cs" />
     <Compile Include="..\..\Services\SharedHealthData.cs" Link="App\SharedHealthData.cs" />
     <Compile Include="..\..\Services\HealthReadPlan.cs" Link="App\HealthReadPlan.cs" />
+    <Compile Include="..\..\Services\DailyReminders.cs" Link="App\DailyReminders.cs" />
   </ItemGroup>
 
   <ItemGroup>

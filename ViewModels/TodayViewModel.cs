@@ -13,14 +13,74 @@ public partial class TodayViewModel : ObservableObject
     public WeatherService Weather;
     public HealthExportService Exporter;
     public ErrorLog Errors;
+    public ISettingsStore Settings;
+    public IReminderPlatform Reminders;
     bool loading;
 
-    public TodayViewModel(ITrackerStore store, WeatherService weather, HealthExportService exporter, ErrorLog errors)
+    public TodayViewModel(ITrackerStore store, WeatherService weather, HealthExportService exporter, ErrorLog errors,
+        ISettingsStore settings, IReminderPlatform reminders)
     {
         Store = store;
         Weather = weather;
         Exporter = exporter;
         Errors = errors;
+        Settings = settings;
+        Reminders = reminders;
+        remindersOn = DailyReminders.IsEnabled(settings);
+    }
+
+    bool remindersOn;
+    public bool RemindersOn
+    {
+        get => remindersOn;
+        set
+        {
+            if (!SetProperty(ref remindersOn, value)) return;
+            DailyReminders.SetEnabled(Settings, value);
+            if (!value) Reminders.ClearShown();
+            _ = RefreshRemindersAsync();
+        }
+    }
+
+    [ObservableProperty] public partial string ReminderText { get; set; } = "";
+    [ObservableProperty] public partial string OpenTasksText { get; set; } = "";
+    [ObservableProperty] public partial bool CanStopToday { get; set; }
+    [ObservableProperty] public partial bool CanResumeToday { get; set; }
+
+    /// <summary>Updates the reminders card, and clears the notification once today's list is done.</summary>
+    public async Task RefreshRemindersAsync()
+    {
+        try
+        {
+            var now = DateTime.Now;
+            var today = DateOnly.FromDateTime(now);
+            var tasks = await DailyReminders.LoadOpenTasksAsync(Store, today);
+            var stopped = DailyReminders.IsStopped(Settings, today);
+            ReminderText = DailyReminders.StatusText(now, Settings, tasks);
+            OpenTasksText = tasks.Count == 0 ? "" : DailyReminders.Body(tasks);
+            CanStopToday = RemindersOn && !stopped && tasks.Count > 0;
+            CanResumeToday = RemindersOn && stopped;
+            if (tasks.Count == 0) Reminders.ClearShown();
+        }
+        catch (Exception exception)
+        {
+            Errors.Record("Refreshing reminders", exception);
+        }
+    }
+
+    [RelayCommand]
+    Task StopRemindersTodayAsync()
+    {
+        DailyReminders.StopFor(Settings, DateOnly.FromDateTime(DateTime.Now));
+        Reminders.ClearShown();
+        return RefreshRemindersAsync();
+    }
+
+    [RelayCommand]
+    Task ResumeRemindersTodayAsync()
+    {
+        DailyReminders.Resume(Settings);
+        return RefreshRemindersAsync();
     }
 
     public List<string> StressOptions { get; } =
@@ -124,6 +184,7 @@ public partial class TodayViewModel : ObservableObject
             NewFoodTime = new TimeSpan(DateTime.Now.Hour, DateTime.Now.Minute, 0);
 
             await RefreshWeatherTextAsync(day);
+            await RefreshRemindersAsync();
         }
         catch (Exception exception)
         {
@@ -218,6 +279,7 @@ public partial class TodayViewModel : ObservableObject
         await Store.SaveCheckInAsync(checkIn);
         SavedText = $"Saved {DateTime.Now:h:mm tt}";
         _ = Exporter.ExportIfDueAsync();
+        await RefreshRemindersAsync();
     }
 
     /// <summary>Meals fill in the day's protein total and first meal time, then the check-in is saved.</summary>

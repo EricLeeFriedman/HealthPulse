@@ -58,6 +58,8 @@ public class NightlyExportReceiver : BroadcastReceiver
             NightlyExportScheduler.StartJobNow(context);
         // Always line up the next night (also after reboot or an app update).
         NightlyExportScheduler.Schedule(context);
+        if (intent?.Action != ActionExport)
+            ReminderPlatform.Schedule(context);
     }
 }
 
