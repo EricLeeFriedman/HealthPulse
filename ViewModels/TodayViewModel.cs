@@ -136,6 +136,20 @@ public partial class TodayViewModel : ObservableObject
     [ObservableProperty] public partial TimeSpan NewFoodTime { get; set; } = DateTime.Now.TimeOfDay;
     [ObservableProperty] public partial string MealsSummary { get; set; } = "";
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEditingFood), nameof(FoodButtonText))]
+    public partial FoodEntry? EditingFood { get; set; }
+    public bool IsEditingFood => EditingFood != null;
+    public string FoodButtonText => EditingFood == null ? "Add" : "Save";
+
+    [RelayCommand]
+    void CancelFoodEdit()
+    {
+        EditingFood = null;
+        NewFoodText = "";
+        NewFoodTime = new TimeSpan(DateTime.Now.Hour, DateTime.Now.Minute, 0);
+    }
+
     [ObservableProperty] public partial bool MobilityDone { get; set; }
     [ObservableProperty] public partial string MobilityLabel { get; set; } = "Mobility routine done";
     [ObservableProperty] public partial string Notes { get; set; } = "";
@@ -251,7 +265,7 @@ public partial class TodayViewModel : ObservableObject
         Meals = new ObservableCollection<FoodEntry>(meals);
         MealsSummary = meals.Count == 0
             ? "Nothing logged yet. Write what you ate with rough portions, e.g. \"3 eggs, 1 slice toast, latte\"."
-            : $"{meals.Count} entr{(meals.Count == 1 ? "y" : "ies")}"  + ". Tap one to delete it.";
+            : $"{meals.Count} entr{(meals.Count == 1 ? "y" : "ies")}"  + ". Tap one to edit or delete it.";
     }
 
     DailyCheckIn BuildCheckIn() => new()
@@ -294,25 +308,35 @@ public partial class TodayViewModel : ObservableObject
     [RelayCommand]
     Task AddFoodAsync() => UiActions.RunAsync(Errors, "Saving food", async () =>
     {
-        var entry = new FoodEntry
-        {
-            Time = Date.Date + NewFoodTime,
-            Text = NewFoodText,
-        };
+        var entry = EditingFood ?? new FoodEntry();
+        entry.Time = Date.Date + NewFoodTime;
+        entry.Text = NewFoodText;
         await Store.SaveFoodAsync(entry);
+        EditingFood = null;
         NewFoodText = "";
         await LoadMealsAsync(DateOnly.FromDateTime(Date));
         await ApplyMealsAsync();
     });
 
+    /// <summary>Tap an entry to edit or delete it.</summary>
     [RelayCommand]
-    Task DeleteFoodAsync(FoodEntry? entry) => UiActions.RunAsync(Errors, "Deleting food", async () =>
+    Task FoodTappedAsync(FoodEntry? entry) => UiActions.RunAsync(Errors, "Changing food", async () =>
     {
         if (entry == null) return;
-        if (!await Shell.Current.DisplayAlertAsync("Delete entry?", entry.Text, "Delete", "Cancel")) return;
-        await Store.DeleteFoodAsync(entry.Id);
-        await LoadMealsAsync(DateOnly.FromDateTime(Date));
-        await ApplyMealsAsync();
+        var choice = await Shell.Current.DisplayActionSheetAsync(entry.Text, "Cancel", "Delete", "Edit");
+        if (choice == "Edit")
+        {
+            EditingFood = entry;
+            NewFoodText = entry.Text;
+            NewFoodTime = entry.Time.TimeOfDay;
+        }
+        else if (choice == "Delete")
+        {
+            await Store.DeleteFoodAsync(entry.Id);
+            if (EditingFood?.Id == entry.Id) CancelFoodEdit();
+            await LoadMealsAsync(DateOnly.FromDateTime(Date));
+            await ApplyMealsAsync();
+        }
     });
 
     [RelayCommand]
