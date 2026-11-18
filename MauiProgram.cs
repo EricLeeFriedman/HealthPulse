@@ -55,7 +55,7 @@ public static class MauiProgram
                 services.GetRequiredService<ISettingsStore>(),
                 services.GetRequiredService<ILogger<HealthExportService>>())
             {
-                RecentErrors = () => errors.Entries,
+                RecentErrors = () => errors.Recent(DateTime.Now),
                 ExportFailed = exception => errors.Record("Export", exception),
                 Trackers = services.GetRequiredService<ITrackerStore>(),
                 RefreshWeather = (today, days) =>
