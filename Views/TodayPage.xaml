@@ -49,17 +49,19 @@
                         <Label Text="{Binding CaffeineText}" VerticalOptions="Center" FontSize="15" />
                         <Stepper Grid.Column="1" Minimum="0" Maximum="20" Increment="1" Value="{Binding CaffeineCups}" />
                     </Grid>
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
                         <CheckBox IsChecked="{Binding HasLastCaffeine}" Color="#0F766E" />
                         <Label Grid.Column="1" Text="Last caffeine at" VerticalOptions="Center" />
                         <TimePicker Grid.Column="2" Time="{Binding LastCaffeineTime}" IsEnabled="{Binding HasLastCaffeine}" />
+                        <Button Grid.Column="3" Text="Now" Style="{StaticResource SecondaryButton}" Command="{Binding CaffeineTimeNowCommand}" />
                     </Grid>
                     <Button Text="☕  Had a coffee just now" Style="{StaticResource SecondaryButton}" Command="{Binding CaffeineNowCommand}" />
 
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Margin="0,6,0,0">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8" Margin="0,6,0,0">
                         <CheckBox IsChecked="{Binding HasFirstMeal}" Color="#0F766E" />
                         <Label Grid.Column="1" Text="First meal at" VerticalOptions="Center" />
                         <TimePicker Grid.Column="2" Time="{Binding FirstMealTime}" IsEnabled="{Binding HasFirstMeal}" />
+                        <Button Grid.Column="3" Text="Now" Style="{StaticResource SecondaryButton}" Command="{Binding MealTimeNowCommand}" />
                     </Grid>
                     <Button Text="🍳  Ate my first meal just now" Style="{StaticResource SecondaryButton}" Command="{Binding MealNowCommand}" />
                 </VerticalStackLayout>
@@ -69,11 +71,12 @@
                 <VerticalStackLayout Spacing="8">
                     <Label Text="Food log" Style="{StaticResource CardTitle}" />
                     <Editor Text="{Binding NewFoodText}" Placeholder="What did you eat? e.g. 3 eggs, 1 slice toast, big latte" AutoSize="TextChanges" MaxLength="500" />
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
                         <TimePicker Time="{Binding NewFoodTime}" />
-                        <Button Grid.Column="1" Text="Cancel" Style="{StaticResource SecondaryButton}"
+                        <Button Grid.Column="1" Text="Now" Style="{StaticResource SecondaryButton}" Command="{Binding FoodTimeNowCommand}" />
+                        <Button Grid.Column="2" Text="Cancel" Style="{StaticResource SecondaryButton}"
                                 Command="{Binding CancelFoodEditCommand}" IsVisible="{Binding IsEditingFood}" />
-                        <Button Grid.Column="2" Text="{Binding FoodButtonText}" Style="{StaticResource PrimaryButton}" Command="{Binding AddFoodCommand}" />
+                        <Button Grid.Column="3" Text="{Binding FoodButtonText}" Style="{StaticResource PrimaryButton}" Command="{Binding AddFoodCommand}" />
                     </Grid>
                     <Label Text="{Binding MealsSummary}" Style="{StaticResource Muted}" />
                     <VerticalStackLayout Spacing="6" BindableLayout.ItemsSource="{Binding Meals}">

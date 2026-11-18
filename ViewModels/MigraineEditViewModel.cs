@@ -125,6 +125,15 @@ public partial class MigraineEditViewModel : ObservableObject, IQueryAttributabl
     };
 
     [RelayCommand]
+    void StartNow() => (StartDate, StartClock) = ClockNow.Stamp(DateTime.Now);
+
+    [RelayCommand]
+    void EndNow() => (EndDate, EndClock) = ClockNow.Stamp(DateTime.Now);
+
+    [RelayCommand]
+    void TriptanNow() => (TriptanDate, TriptanClock) = ClockNow.Stamp(DateTime.Now);
+
+    [RelayCommand]
     async Task SaveAsync()
     {
         ToForm().ApplyTo(entry);
