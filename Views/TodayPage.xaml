@@ -65,9 +65,11 @@
                 <VerticalStackLayout Spacing="8">
                     <Label Text="Food log" Style="{StaticResource CardTitle}" />
                     <Editor Text="{Binding NewFoodText}" Placeholder="What did you eat? e.g. 3 eggs, 1 slice toast, big latte" AutoSize="TextChanges" MaxLength="500" />
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                         <TimePicker Time="{Binding NewFoodTime}" />
-                        <Button Grid.Column="1" Text="Add" Style="{StaticResource PrimaryButton}" Command="{Binding AddFoodCommand}" />
+                        <Button Grid.Column="1" Text="Cancel" Style="{StaticResource SecondaryButton}"
+                                Command="{Binding CancelFoodEditCommand}" IsVisible="{Binding IsEditingFood}" />
+                        <Button Grid.Column="2" Text="{Binding FoodButtonText}" Style="{StaticResource PrimaryButton}" Command="{Binding AddFoodCommand}" />
                     </Grid>
                     <Label Text="{Binding MealsSummary}" Style="{StaticResource Muted}" />
                     <VerticalStackLayout Spacing="6" BindableLayout.ItemsSource="{Binding Meals}">
@@ -75,7 +77,7 @@
                             <DataTemplate x:DataType="models:FoodEntry">
                                 <Grid ColumnDefinitions="70,*" ColumnSpacing="8">
                                     <Grid.GestureRecognizers>
-                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:TodayViewModel}}, Path=DeleteFoodCommand, x:DataType=vm:TodayViewModel}"
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:TodayViewModel}}, Path=FoodTappedCommand, x:DataType=vm:TodayViewModel}"
                                                               CommandParameter="{Binding .}" />
                                     </Grid.GestureRecognizers>
                                     <Label Text="{Binding DisplayTime}" FontAttributes="Bold" TextColor="#0F766E" />
