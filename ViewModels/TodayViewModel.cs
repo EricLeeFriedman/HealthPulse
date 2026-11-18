@@ -89,6 +89,16 @@ public partial class TodayViewModel : ObservableObject
     [ObservableProperty] public partial DateTime Date { get; set; } = DateTime.Today;
     [ObservableProperty] public partial string PlanText { get; set; } = "";
     [ObservableProperty] public partial string TargetText { get; set; } = "";
+    [ObservableProperty] public partial string WorkoutGuideText { get; set; } = "";
+    [ObservableProperty] public partial bool HasWorkoutGuide { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WorkoutGuideButtonText))]
+    public partial bool ShowWorkoutGuide { get; set; }
+    public string WorkoutGuideButtonText => ShowWorkoutGuide ? "Hide" : "ⓘ How to do today's workout";
+
+    [RelayCommand]
+    void ToggleWorkoutGuide() => ShowWorkoutGuide = !ShowWorkoutGuide;
     [ObservableProperty] public partial string WeatherText { get; set; } = "";
     [ObservableProperty] public partial string SavedText { get; set; } = "";
 
@@ -171,6 +181,8 @@ public partial class TodayViewModel : ObservableObject
                 ? $"{day:dddd}: off. Rest day."
                 : $"{day:dddd}: {planned} (block {WorkoutPlan.Block(day)}, week {WorkoutPlan.WeekInBlock(day)})";
             TargetText = planned == null ? "" : WorkoutPlan.TargetFor(planned, day);
+            WorkoutGuideText = planned == null || planned == WorkoutPlan.Mobility ? "" : ExerciseGuide.SessionText(planned, day);
+            HasWorkoutGuide = WorkoutGuideText.Length > 0;
             MobilityLabel = day.DayOfWeek == DayOfWeek.Sunday ? "Sunday mobility routine done" : "Mobility routine done";
 
             var c = await Store.GetCheckInAsync(day);

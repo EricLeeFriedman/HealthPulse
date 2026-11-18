@@ -41,6 +41,16 @@ public partial class ExerciseLog : ObservableObject
     public string Unit => Template.Unit + (Template.Weighted ? ", lb" : "");
     public string Hint { get; }
     public bool HasHint => !string.IsNullOrEmpty(Hint);
+    public string HowTo => ExerciseGuide.For(Template.Name) is { } guide ? $"{guide.How} {guide.Load}" : "";
+    public bool HasHowTo => HowTo.Length > 0;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HowToButtonText))]
+    public partial bool ShowHowTo { get; set; }
+    public string HowToButtonText => ShowHowTo ? "Hide" : "ⓘ How";
+
+    [RelayCommand]
+    void ToggleHowTo() => ShowHowTo = !ShowHowTo;
     public ObservableCollection<SetLog> Sets { get; } = [];
 
     [RelayCommand]
