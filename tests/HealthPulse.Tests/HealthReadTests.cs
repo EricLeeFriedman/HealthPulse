@@ -161,3 +161,30 @@ public class SharedHealthDataTests
         public Task WriteAsync(string content) { Last = content; return Task.CompletedTask; }
     }
 }
+
+public class HealthReadPlanTests
+{
+    [Fact]
+    public void Chunks_CoverRangeNewestFirstWithoutGaps()
+    {
+        var start = new DateTime(2026, 8, 20);
+        var end = new DateTime(2026, 11, 18);
+
+        var chunks = HealthReadPlan.Chunks(start, end, 15).ToList();
+
+        Assert.Equal(6, chunks.Count);
+        Assert.Equal(end, chunks[0].End);
+        Assert.Equal(new DateTime(2026, 11, 3), chunks[0].Start);
+        Assert.Equal(start, chunks[^1].Start);
+        for (var i = 1; i < chunks.Count; i++)
+            Assert.Equal(chunks[i - 1].Start, chunks[i].End);
+    }
+
+    [Fact]
+    public void Chunks_ShortRangeIsOneWindow()
+    {
+        var start = new DateTime(2026, 11, 10);
+        var chunk = Assert.Single(HealthReadPlan.Chunks(start, start.AddDays(3), 15));
+        Assert.Equal(start, chunk.Start);
+    }
+}

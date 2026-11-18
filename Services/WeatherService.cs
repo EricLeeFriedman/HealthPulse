@@ -41,6 +41,12 @@ public class WeatherService
     public ILogger<WeatherService> Logger;
     public string BaseUrl { get; set; } = "https://api.open-meteo.com/v1/forecast";
 
+    /// <summary>Open-Meteo asks API clients to identify themselves.</summary>
+    public const string UserAgent = "HealthPulse/1.0 (personal health app; Android)";
+
+    /// <summary>If a long look-back is refused, try again with this many days so recent pressure still arrives.</summary>
+    public const int ShortRetryDays = 14;
+
     public WeatherService(HttpClient http, ITrackerStore store, ISettingsStore settings, ILocationProvider location,
         ILogger<WeatherService>? logger = null)
     {
@@ -158,11 +164,15 @@ public class WeatherService
             var location = await ResolveLocationAsync(interactive);
             if (location == null) return "Location not available yet. Open the Today tab and allow location for weather.";
 
-            var url = BuildUrl(BaseUrl, location.Value.Latitude, location.Value.Longitude, Math.Min(pastDays, MaxPastDays));
-            using var response = await Http.GetAsync(url);
-            var body = await response.Content.ReadAsStringAsync();
-            if (!response.IsSuccessStatusCode)
-                throw new HttpRequestException($"Weather service returned {(int)response.StatusCode}.");
+            pastDays = Math.Min(pastDays, MaxPastDays);
+            var (ok, status, body) = await FetchAsync(location.Value, pastDays);
+            if (!ok && status is >= 400 and < 500 && pastDays > ShortRetryDays)
+            {
+                Logger.LogWarning("Weather refused {Status} for {Days} days; retrying with {Short}", status, pastDays, ShortRetryDays);
+                (ok, status, body) = await FetchAsync(location.Value, ShortRetryDays);
+            }
+            if (!ok)
+                throw new HttpRequestException($"Weather service returned {status}: {Reason(body)}");
 
             var now = DateTime.UtcNow;
             var summaries = Summarize(ParseHourly(body), now)
@@ -186,6 +196,34 @@ public class WeatherService
             Logger.LogWarning(exception, "Weather update failed");
             return exception.Message;
         }
+    }
+
+    async Task<(bool Ok, int Status, string Body)> FetchAsync((double Latitude, double Longitude) location, int pastDays)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            BuildUrl(BaseUrl, location.Latitude, location.Longitude, pastDays));
+        request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
+        using var response = await Http.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+        return (response.IsSuccessStatusCode, (int)response.StatusCode, body);
+    }
+
+    /// <summary>Open-Meteo explains errors as {"error":true,"reason":"..."}; otherwise show the start of the body.</summary>
+    public static string Reason(string body)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            if (document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("reason", out var reason))
+                return reason.GetString() ?? "no reason given";
+        }
+        catch (JsonException)
+        {
+        }
+        var text = body.Trim();
+        if (text.Length == 0) return "no details";
+        return text.Length <= 200 ? text : text[..200] + "…";
     }
 
     async Task<(double Latitude, double Longitude)?> ResolveLocationAsync(bool interactive)
