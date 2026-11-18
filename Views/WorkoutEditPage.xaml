@@ -33,7 +33,12 @@
                     <DataTemplate x:DataType="vm:ExerciseLog">
                         <Border Style="{StaticResource Card}">
                             <VerticalStackLayout Spacing="6">
-                                <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="#0F766E" />
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="#0F766E" VerticalOptions="Center" />
+                                    <Button Grid.Column="1" Text="{Binding HowToButtonText}" Style="{StaticResource SecondaryButton}"
+                                            Padding="12,4" Command="{Binding ToggleHowToCommand}" IsVisible="{Binding HasHowTo}" />
+                                </Grid>
+                                <Label Text="{Binding HowTo}" FontSize="14" TextColor="#374151" IsVisible="{Binding ShowHowTo}" />
                                 <Label Text="{Binding Unit}" Style="{StaticResource Muted}" />
                                 <Label Text="{Binding Hint}" Style="{StaticResource Muted}" IsVisible="{Binding HasHint}" />
                                 <VerticalStackLayout Spacing="4" BindableLayout.ItemsSource="{Binding Sets}">
