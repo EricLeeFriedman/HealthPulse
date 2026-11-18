@@ -11,6 +11,10 @@ sealed class FakeOpenMeteo : HttpMessageHandler
 {
     public readonly List<string> Requests = [];
     public HttpStatusCode Status = HttpStatusCode.OK;
+    /// <summary>Optional status by look-back days, to mimic a refused long request.</summary>
+    public Func<int, HttpStatusCode>? StatusFor;
+    public string ErrorBody = "{\"error\":true,\"reason\":\"Request blocked\"}";
+    public readonly List<string> UserAgents = [];
     /// <summary>Pressure for an hour; default falls 1 hPa every 6 hours from 1020.</summary>
     public Func<DateTime, double> Pressure = time => 1020 - (time - new DateTime(2026, 1, 1)).TotalHours / 6 % 20;
 
@@ -18,6 +22,7 @@ sealed class FakeOpenMeteo : HttpMessageHandler
     {
         var url = request.RequestUri!.ToString();
         Requests.Add(url);
+        UserAgents.Add(request.Headers.UserAgent.ToString());
         var query = request.RequestUri.Query.TrimStart('?').Split('&')
             .Select(p => p.Split('=')).ToDictionary(p => p[0], p => Uri.UnescapeDataString(p[1]));
         var pastDays = int.Parse(query["past_days"], CultureInfo.InvariantCulture);
@@ -40,7 +45,9 @@ sealed class FakeOpenMeteo : HttpMessageHandler
                 relative_humidity_2m = times.Select(_ => 60.0),
             }
         });
-        return Task.FromResult(new HttpResponseMessage(Status) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
+        var status = StatusFor?.Invoke(pastDays) ?? Status;
+        if ((int)status >= 400) body = ErrorBody;
+        return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
     }
 }
 
@@ -185,5 +192,38 @@ public sealed class WeatherTests : IAsyncLifetime
         error = await service.RefreshAsync(today, 7, interactive: true);
         Assert.Contains("500", error);
         Assert.Null(service.LastFetchUtc);
+    }
+
+    [Fact]
+    public async Task RefusedLongLookBack_RetriesWithTwoWeeks()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        api.StatusFor = days => days > WeatherService.ShortRetryDays ? HttpStatusCode.Forbidden : HttpStatusCode.OK;
+
+        Assert.Null(await service.RefreshAsync(today, 90, interactive: true));
+
+        Assert.Equal(2, api.Requests.Count);
+        Assert.Contains("past_days=14", api.Requests[1]);
+        Assert.NotEmpty(await store.GetWeatherAsync(today.AddDays(-3), today));
+    }
+
+    [Fact]
+    public async Task Refused_ReportsStatusAndOpenMeteoReason()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        api.Status = HttpStatusCode.Forbidden;
+
+        var error = await service.RefreshAsync(today, 90, interactive: true);
+
+        Assert.Equal("Weather service returned 403: Request blocked", error);
+        Assert.All(api.UserAgents, ua => Assert.StartsWith("HealthPulse/1.0", ua));
+    }
+
+    [Fact]
+    public void Reason_FallsBackToBodyText()
+    {
+        Assert.Equal("Request blocked", WeatherService.Reason("{\"error\":true,\"reason\":\"Request blocked\"}"));
+        Assert.Equal("<html>Forbidden</html>", WeatherService.Reason("<html>Forbidden</html>"));
+        Assert.Equal("no details", WeatherService.Reason(""));
     }
 }

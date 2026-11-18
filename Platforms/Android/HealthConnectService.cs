@@ -123,8 +123,8 @@ public class HealthConnectService : IHealthDataService
 
         // Most useful first, so a slow phone still exports sleep and steps.
         if (granted.Contains(ReadSleep))
-            await report.RunAsync("sleep", () => ReadSleepAsync(start, end, summaries));
-        await report.RunAsync("steps and heart rate", () => ReadDailyAggregatesAsync(granted, start, end, summaries));
+            await report.RunAsync("sleep", () => ReadSleepAsync(start, end, summaries, report));
+        await report.RunAsync("steps and heart rate", () => ReadDailyAggregatesAsync(granted, start, end, summaries, report));
         if (granted.Contains(ReadExercise))
             await report.RunAsync("exercise", () => ReadExerciseAsync(granted, start, end, summaries, report));
         if (granted.Contains(ReadHrv))
@@ -141,25 +141,59 @@ public class HealthConnectService : IHealthDataService
     // Steps and heart rate: aggregated by Health Connect per local day, which
     // de-duplicates overlapping phone and watch data.
     // ---------------------------------------------------------------------
+    /// <summary>Days per aggregate call. 90 days of watch heart rate in one call took over 25 s.</summary>
+    const int AggregateChunkDays = 15;
+
     async Task ReadDailyAggregatesAsync(
         HashSet<string> granted,
         DateTime start,
         DateTime end,
+        Dictionary<DateOnly, DailyHealthSummary> summaries,
+        HealthReadReport report)
+    {
+        var groups = new List<(string Name, MetricTarget[] Metrics)>();
+        if (granted.Contains(ReadSteps))
+            groups.Add(("steps", [new(StepsRecord.CountTotal, (d, v) => d.Steps = v)]));
+        if (granted.Contains(ReadRestingHeartRate))
+            groups.Add(("resting heart rate", [new(RestingHeartRateRecord.BpmAvg, (d, v) => d.RestingHeartRate = v)]));
+        if (granted.Contains(ReadHeartRate))
+            groups.Add(("heart rate",
+            [
+                new(HeartRateRecord.BpmAvg, (d, v) => d.AvgHeartRate = v),
+                new(HeartRateRecord.BpmMin, (d, v) => d.MinHeartRate = v),
+                new(HeartRateRecord.BpmMax, (d, v) => d.MaxHeartRate = v),
+            ]));
+
+        // Each metric group in small windows, newest first, so a slow window only loses those days.
+        foreach (var (name, metrics) in groups)
+        {
+            int ok = 0, failed = 0, skipped = 0;
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            foreach (var (chunkStart, chunkEnd) in HealthReadPlan.Chunks(start, end, AggregateChunkDays))
+            {
+                if (report.OutOfTime || failed >= 2) { skipped++; continue; }
+                try
+                {
+                    await ReadAggregateChunkAsync(metrics, chunkStart, chunkEnd, summaries);
+                    ok++;
+                }
+                catch (Exception exception)
+                {
+                    failed++;
+                    report.Note($"{name} {chunkStart:MM-dd}..{chunkEnd.AddDays(-1):MM-dd} failed ({exception.GetType().Name}: {exception.Message})");
+                }
+            }
+            report.Note($"{name}: {ok} ok, {failed} failed, {skipped} skipped windows in {watch.ElapsedMilliseconds} ms");
+        }
+    }
+
+    sealed record MetricTarget(AggregateMetric Metric, Action<DailyHealthSummary, long?> Set);
+
+    async Task ReadAggregateChunkAsync(MetricTarget[] metrics, DateTime start, DateTime end,
         Dictionary<DateOnly, DailyHealthSummary> summaries)
     {
-        var metrics = new List<AggregateMetric>();
-        if (granted.Contains(ReadSteps)) metrics.Add(StepsRecord.CountTotal);
-        if (granted.Contains(ReadHeartRate))
-        {
-            metrics.Add(HeartRateRecord.BpmAvg);
-            metrics.Add(HeartRateRecord.BpmMin);
-            metrics.Add(HeartRateRecord.BpmMax);
-        }
-        if (granted.Contains(ReadRestingHeartRate)) metrics.Add(RestingHeartRateRecord.BpmAvg);
-        if (metrics.Count == 0) return;
-
         var request = new AggregateGroupByPeriodRequest(
-            new JavaSet<AggregateMetric>(metrics),
+            new JavaSet<AggregateMetric>(metrics.Select(m => m.Metric).ToList()),
             TimeRangeFilter.Between(ToLocalDateTime(start), ToLocalDateTime(end)),
             Java.Time.Period.OfDays(1)!,
             new JavaSet<DataOrigin>());
@@ -175,15 +209,8 @@ public class HealthConnectService : IHealthDataService
             if (!summaries.TryGetValue(date, out var summary)) continue;
             var values = bucket.Result;
 
-            summary.Steps = GetLong(values, granted.Contains(ReadSteps) ? StepsRecord.CountTotal : null);
-            if (granted.Contains(ReadHeartRate))
-            {
-                summary.AvgHeartRate = GetLong(values, HeartRateRecord.BpmAvg);
-                summary.MinHeartRate = GetLong(values, HeartRateRecord.BpmMin);
-                summary.MaxHeartRate = GetLong(values, HeartRateRecord.BpmMax);
-            }
-            if (granted.Contains(ReadRestingHeartRate))
-                summary.RestingHeartRate = GetLong(values, RestingHeartRateRecord.BpmAvg);
+            foreach (var target in metrics)
+                target.Set(summary, GetLong(values, target.Metric));
         }
     }
 
@@ -194,12 +221,19 @@ public class HealthConnectService : IHealthDataService
         return value == null ? null : value.JavaCast<Java.Lang.Number>().LongValue();
     }
 
-    async Task ReadSleepAsync(DateTime start, DateTime end, Dictionary<DateOnly, DailyHealthSummary> summaries)
+    async Task ReadSleepAsync(DateTime start, DateTime end, Dictionary<DateOnly, DailyHealthSummary> summaries,
+        HealthReadReport report)
     {
         // Look back far enough to catch a night that started the evening before the range.
         var records = await ReadAllAsync<SleepSessionRecord>(start.AddHours(-18), end);
         foreach (var record in records)
             HealthSummaryBuilder.AddSleepSession(summaries, ToLocal(record.StartTime), ToLocal(record.EndTime));
+        // Which apps wrote sleep, and the last nights seen, to tell a missing night from a read gap.
+        var sources = records.GroupBy(r => r.Metadata.DataOrigin.PackageName)
+            .Select(g => $"{g.Key} x{g.Count()}");
+        var recent = records.Select(r => ToLocal(r.EndTime)).OrderByDescending(t => t).Take(7)
+            .Select(t => t.ToString("MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture));
+        report.Note($"sleep: {records.Count} sessions from {string.Join(", ", sources)}; latest wake times {string.Join(", ", recent)}");
     }
 
     async Task ReadHrvAsync(DateTime start, DateTime end, Dictionary<DateOnly, DailyHealthSummary> summaries)
