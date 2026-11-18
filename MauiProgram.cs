@@ -32,10 +32,12 @@ public static class MauiProgram
         builder.Services.AddSingleton<IHealthDataService>(services =>
             new SharedHealthData(services.GetRequiredService<Platforms.Android.HealthConnectService>()));
         builder.Services.AddSingleton<IGoogleAuth, Platforms.Android.GoogleAuthService>();
+        builder.Services.AddSingleton<IReminderPlatform, Platforms.Android.ReminderPlatform>();
         builder.Services.AddSingleton<ILocationProvider, Platforms.Android.AndroidLocationProvider>();
 #else
         builder.Services.AddSingleton<IHealthDataService, UnsupportedHealthDataService>();
         builder.Services.AddSingleton<IGoogleAuth, UnsupportedGoogleAuth>();
+        builder.Services.AddSingleton<IReminderPlatform, UnsupportedReminderPlatform>();
         builder.Services.AddSingleton<ILocationProvider, UnsupportedLocationProvider>();
 #endif
         builder.Services.AddSingleton(services => new WeatherService(

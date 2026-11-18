@@ -28,6 +28,14 @@ namespace HealthPulse
             {
                 IPlatformApplication.Current?.Services.GetService<ErrorLog>()?.Record("Scheduling nightly export", exception);
             }
+            try
+            {
+                ReminderPlatform.Schedule(this);
+            }
+            catch (Exception exception)
+            {
+                IPlatformApplication.Current?.Services.GetService<ErrorLog>()?.Record("Scheduling reminders", exception);
+            }
         }
     }
 }

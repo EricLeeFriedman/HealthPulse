@@ -25,6 +25,21 @@
 
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Reminders" Style="{StaticResource CardTitle}" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding RemindersOn}" OnColor="#0F766E" />
+                    </Grid>
+                    <Label Text="{Binding ReminderText}" Style="{StaticResource Muted}" />
+                    <Label Text="{Binding OpenTasksText}" FontSize="14" TextColor="#374151" />
+                    <Button Text="Stop reminders for today" Style="{StaticResource SecondaryButton}"
+                            Command="{Binding StopRemindersTodayCommand}" IsVisible="{Binding CanStopToday}" />
+                    <Button Text="Turn today's reminders back on" Style="{StaticResource SecondaryButton}"
+                            Command="{Binding ResumeRemindersTodayCommand}" IsVisible="{Binding CanResumeToday}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
                     <Label Text="Caffeine and food" Style="{StaticResource CardTitle}" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <Label Text="{Binding CaffeineText}" VerticalOptions="Center" FontSize="15" />
