@@ -34,7 +34,7 @@ public class DailyRemindersTests
     {
         var tasks = DailyReminders.OpenTasks(Monday, new DailyCheckIn { UpdatedAt = DateTime.MinValue }, [], null);
 
-        Assert.Equal(new[] { "preventives", "workout", "checkin", "protein", "measure" }, tasks.Select(t => t.Key));
+        Assert.Equal(new[] { "preventives", "workout", "checkin", "measure" }, tasks.Select(t => t.Key));
         Assert.Contains("riboflavin, B complex, CoQ10, magnesium", tasks[0].Text);
         Assert.Equal("Do today's workout: Strength A", tasks[1].Text);
     }
@@ -82,18 +82,18 @@ public class DailyRemindersTests
     public void SundayMobility_DoneByCheckboxOrSession()
     {
         var checkIn = Done(Sunday);
-        Assert.Equal("Do your mobility routine", Assert.Single(DailyReminders.OpenTasks(Sunday, checkIn, [], Sunday)).Text);
+        Assert.Equal("Do your mobility routine (steps on the Today tab)", Assert.Single(DailyReminders.OpenTasks(Sunday, checkIn, [], Sunday)).Text);
         checkIn.MobilityDone = true;
         Assert.Empty(DailyReminders.OpenTasks(Sunday, checkIn, [], Sunday));
         Assert.Empty(DailyReminders.OpenTasks(Sunday, Done(Sunday), [Workout(Sunday, WorkoutPlan.Mobility)], Sunday));
     }
 
     [Fact]
-    public void Protein_ShowsAmountSoFar()
+    public void Protein_IsNeverAReminder()
     {
         var checkIn = Done(Saturday);
-        checkIn.ProteinGrams = 80;
-        Assert.Equal("Reach 120 g protein (80 g so far)", Assert.Single(DailyReminders.OpenTasks(Saturday, checkIn, [], Saturday)).Text);
+        checkIn.ProteinGrams = null;
+        Assert.Empty(DailyReminders.OpenTasks(Saturday, checkIn, [], Saturday));
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public class DailyRemindersTests
     {
         var settings = new InMemorySettingsStore();
         var noon = new DateTime(2026, 11, 23, 12, 0, 0);
-        var open = new List<ReminderTask> { new("protein", "Reach 120 g protein") };
+        var open = new List<ReminderTask> { new("checkin", "Log today's check-in") };
 
         Assert.True(DailyReminders.ShouldNotify(noon, settings, open));
         Assert.False(DailyReminders.ShouldNotify(noon, settings, []));

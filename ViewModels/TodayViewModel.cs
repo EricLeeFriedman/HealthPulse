@@ -119,22 +119,21 @@ public partial class TodayViewModel : ObservableObject
     [ObservableProperty] public partial bool CoQ10 { get; set; }
     [ObservableProperty] public partial bool Magnesium { get; set; }
 
+    /// <summary>Kept so an existing value survives saves; protein is estimated from meals in the daily review.</summary>
+    public string ProteinGrams { get; set; } = "";
+
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ProteinStatusText))]
-    public partial string ProteinGrams { get; set; } = "";
-    public string ProteinStatusText
-    {
-        get
-        {
-            try { return TrackerRules.ProteinText(TrackerRules.ParseInt(ProteinGrams, "Protein")); }
-            catch (ArgumentException) { return "Enter grams as a whole number"; }
-        }
-    }
+    [NotifyPropertyChangedFor(nameof(MobilityButtonText))]
+    public partial bool ShowMobilityRoutine { get; set; }
+    public string MobilityButtonText => ShowMobilityRoutine ? "Hide" : "ⓘ Steps";
+    public string MobilityRoutineText { get; } = WorkoutPlan.MobilityRoutineText;
+
+    [RelayCommand]
+    void ToggleMobilityRoutine() => ShowMobilityRoutine = !ShowMobilityRoutine;
 
     [ObservableProperty] public partial ObservableCollection<FoodEntry> Meals { get; set; } = [];
     [ObservableProperty] public partial string NewFoodText { get; set; } = "";
     [ObservableProperty] public partial TimeSpan NewFoodTime { get; set; } = DateTime.Now.TimeOfDay;
-    [ObservableProperty] public partial string NewFoodProtein { get; set; } = "";
     [ObservableProperty] public partial string MealsSummary { get; set; } = "";
 
     [ObservableProperty] public partial bool MobilityDone { get; set; }
@@ -250,10 +249,9 @@ public partial class TodayViewModel : ObservableObject
     {
         var meals = await Store.GetFoodAsync(day, day);
         Meals = new ObservableCollection<FoodEntry>(meals);
-        var protein = FoodLog.ProteinTotal(meals);
         MealsSummary = meals.Count == 0
             ? "Nothing logged yet. Write what you ate with rough portions, e.g. \"3 eggs, 1 slice toast, latte\"."
-            : $"{meals.Count} entr{(meals.Count == 1 ? "y" : "ies")}" + (protein.HasValue ? $", about {protein} g protein" : "") + ". Tap one to delete it.";
+            : $"{meals.Count} entr{(meals.Count == 1 ? "y" : "ies")}"  + ". Tap one to delete it.";
     }
 
     DailyCheckIn BuildCheckIn() => new()
@@ -300,11 +298,9 @@ public partial class TodayViewModel : ObservableObject
         {
             Time = Date.Date + NewFoodTime,
             Text = NewFoodText,
-            ProteinGrams = TrackerRules.ParseInt(NewFoodProtein, "Protein"),
         };
         await Store.SaveFoodAsync(entry);
         NewFoodText = "";
-        NewFoodProtein = "";
         await LoadMealsAsync(DateOnly.FromDateTime(Date));
         await ApplyMealsAsync();
     });

@@ -58,12 +58,6 @@
                         <TimePicker Grid.Column="2" Time="{Binding FirstMealTime}" IsEnabled="{Binding HasFirstMeal}" />
                     </Grid>
                     <Button Text="🍳  Ate my first meal just now" Style="{StaticResource SecondaryButton}" Command="{Binding MealNowCommand}" />
-
-                    <Label Text="Protein for the day (grams). Filled in from the food log when meals have estimates." Style="{StaticResource Muted}" Margin="0,6,0,0" />
-                    <Grid ColumnDefinitions="100,*" ColumnSpacing="10">
-                        <Entry Text="{Binding ProteinGrams}" Keyboard="Numeric" Placeholder="e.g. 130" />
-                        <Label Grid.Column="1" Text="{Binding ProteinStatusText}" VerticalOptions="Center" Style="{StaticResource Muted}" />
-                    </Grid>
                 </VerticalStackLayout>
             </Border>
 
@@ -71,10 +65,9 @@
                 <VerticalStackLayout Spacing="8">
                     <Label Text="Food log" Style="{StaticResource CardTitle}" />
                     <Editor Text="{Binding NewFoodText}" Placeholder="What did you eat? e.g. 3 eggs, 1 slice toast, big latte" AutoSize="TextChanges" MaxLength="500" />
-                    <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="8">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <TimePicker Time="{Binding NewFoodTime}" />
-                        <Entry Grid.Column="1" Text="{Binding NewFoodProtein}" Keyboard="Numeric" Placeholder="Protein g (optional)" />
-                        <Button Grid.Column="2" Text="Add" Style="{StaticResource PrimaryButton}" Command="{Binding AddFoodCommand}" />
+                        <Button Grid.Column="1" Text="Add" Style="{StaticResource PrimaryButton}" Command="{Binding AddFoodCommand}" />
                     </Grid>
                     <Label Text="{Binding MealsSummary}" Style="{StaticResource Muted}" />
                     <VerticalStackLayout Spacing="6" BindableLayout.ItemsSource="{Binding Meals}">
@@ -131,10 +124,14 @@
 
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="6">
-                    <Grid ColumnDefinitions="Auto,*">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
                         <CheckBox IsChecked="{Binding MobilityDone}" Color="#0F766E" />
                         <Label Grid.Column="1" Text="{Binding MobilityLabel}" VerticalOptions="Center" FontSize="15" />
+                        <Button Grid.Column="2" Text="{Binding MobilityButtonText}" Style="{StaticResource SecondaryButton}"
+                                Padding="12,4" Command="{Binding ToggleMobilityRoutineCommand}" />
                     </Grid>
+                    <Label Text="{Binding MobilityRoutineText}" IsVisible="{Binding ShowMobilityRoutine}"
+                           FontSize="14" TextColor="#374151" LineHeight="1.3" />
                     <Entry Text="{Binding Notes}" Placeholder="Notes (optional)" />
                 </VerticalStackLayout>
             </Border>
