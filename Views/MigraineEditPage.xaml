@@ -14,9 +14,10 @@
                 <VerticalStackLayout Spacing="8">
                     <Label Text="When" Style="{StaticResource CardTitle}" />
                     <Label Text="Started" Style="{StaticResource Muted}" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="10">
                         <DatePicker Date="{Binding StartDate}" Format="ddd MMM d" />
                         <TimePicker Grid.Column="1" Time="{Binding StartClock}" />
+                        <Button Grid.Column="2" Text="Now" Style="{StaticResource SecondaryButton}" Command="{Binding StartNowCommand}" />
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Text="Still going" VerticalOptions="Center" FontSize="15" />
@@ -24,9 +25,10 @@
                     </Grid>
                     <VerticalStackLayout Spacing="8" IsVisible="{Binding HasEnded}">
                         <Label Text="Ended" Style="{StaticResource Muted}" />
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="10">
                             <DatePicker Date="{Binding EndDate}" Format="ddd MMM d" />
                             <TimePicker Grid.Column="1" Time="{Binding EndClock}" />
+                            <Button Grid.Column="2" Text="Now" Style="{StaticResource SecondaryButton}" Command="{Binding EndNowCommand}" />
                         </Grid>
                     </VerticalStackLayout>
                 </VerticalStackLayout>
@@ -58,9 +60,10 @@
                         <Switch Grid.Column="1" IsToggled="{Binding TriptanTaken}" OnColor="#5EEAD4" ThumbColor="#0F766E" />
                     </Grid>
                     <VerticalStackLayout Spacing="8" IsVisible="{Binding TriptanTaken}">
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="10">
                             <DatePicker Date="{Binding TriptanDate}" Format="ddd MMM d" />
                             <TimePicker Grid.Column="1" Time="{Binding TriptanClock}" />
+                            <Button Grid.Column="2" Text="Now" Style="{StaticResource SecondaryButton}" Command="{Binding TriptanNowCommand}" />
                         </Grid>
                         <Label Text="Relief after 2 hours" Style="{StaticResource Muted}" />
                         <Picker ItemsSource="{Binding ReliefOptions}" SelectedIndex="{Binding ReliefIndex}" />

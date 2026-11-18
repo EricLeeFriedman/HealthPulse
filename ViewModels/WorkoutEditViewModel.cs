@@ -89,6 +89,9 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
     [ObservableProperty] public partial bool IsExisting { get; set; }
     [ObservableProperty] public partial DateTime Date { get; set; } = DateTime.Today;
     [ObservableProperty] public partial TimeSpan Clock { get; set; } = DateTime.Now.TimeOfDay;
+
+    [RelayCommand]
+    void SessionNow() => (Date, Clock) = ClockNow.Stamp(DateTime.Now);
     [ObservableProperty] public partial int TypeIndex { get; set; } = -1;
     [ObservableProperty] public partial string TargetText { get; set; } = "";
     [ObservableProperty] public partial string Duration { get; set; } = "";

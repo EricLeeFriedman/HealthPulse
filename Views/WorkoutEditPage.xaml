@@ -15,9 +15,10 @@
                     <Label Text="Session" Style="{StaticResource CardTitle}" />
                     <Label Text="{Binding DetectedText}" FontSize="13" TextColor="#0F766E" IsVisible="{Binding IsDetected}" />
                     <Picker ItemsSource="{Binding SessionTypes}" SelectedIndex="{Binding TypeIndex}" Title="Session type" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="10">
                         <DatePicker Date="{Binding Date}" Format="ddd MMM d" />
                         <TimePicker Grid.Column="1" Time="{Binding Clock}" />
+                        <Button Grid.Column="2" Text="Now" Style="{StaticResource SecondaryButton}" Command="{Binding SessionNowCommand}" />
                     </Grid>
                     <Label Text="{Binding TargetText}" Style="{StaticResource Muted}" />
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="10">

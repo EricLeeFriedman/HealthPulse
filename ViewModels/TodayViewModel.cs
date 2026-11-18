@@ -157,7 +157,7 @@ public partial class TodayViewModel : ObservableObject
     {
         EditingFood = null;
         NewFoodText = "";
-        NewFoodTime = new TimeSpan(DateTime.Now.Hour, DateTime.Now.Minute, 0);
+        NewFoodTime = ClockNow.Time(DateTime.Now);
     }
 
     [ObservableProperty] public partial bool MobilityDone { get; set; }
@@ -206,7 +206,7 @@ public partial class TodayViewModel : ObservableObject
                 : $"Saved {DateTime.SpecifyKind(c.UpdatedAt, DateTimeKind.Utc).ToLocalTime():h:mm tt}";
 
             await LoadMealsAsync(day);
-            NewFoodTime = new TimeSpan(DateTime.Now.Hour, DateTime.Now.Minute, 0);
+            NewFoodTime = ClockNow.Time(DateTime.Now);
 
             await RefreshWeatherTextAsync(day);
             await RefreshRemindersAsync();
@@ -261,14 +261,31 @@ public partial class TodayViewModel : ObservableObject
     {
         CaffeineCups += 1;
         HasLastCaffeine = true;
-        LastCaffeineTime = new TimeSpan(DateTime.Now.Hour, DateTime.Now.Minute, 0);
+        LastCaffeineTime = ClockNow.Time(DateTime.Now);
     }
 
     [RelayCommand]
     void MealNow()
     {
         HasFirstMeal = true;
-        FirstMealTime = new TimeSpan(DateTime.Now.Hour, DateTime.Now.Minute, 0);
+        FirstMealTime = ClockNow.Time(DateTime.Now);
+    }
+
+    [RelayCommand]
+    void FoodTimeNow() => NewFoodTime = ClockNow.Time(DateTime.Now);
+
+    [RelayCommand]
+    void CaffeineTimeNow()
+    {
+        HasLastCaffeine = true;
+        LastCaffeineTime = ClockNow.Time(DateTime.Now);
+    }
+
+    [RelayCommand]
+    void MealTimeNow()
+    {
+        HasFirstMeal = true;
+        FirstMealTime = ClockNow.Time(DateTime.Now);
     }
 
     async Task LoadMealsAsync(DateOnly day)
