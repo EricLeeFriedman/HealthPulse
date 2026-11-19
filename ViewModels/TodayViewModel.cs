@@ -7,6 +7,29 @@ using HealthPulse.Services;
 
 namespace HealthPulse.ViewModels;
 
+/// <summary>One alternative on the Today tab, with its own How toggle.</summary>
+public partial class AlternativeItem : ObservableObject
+{
+    public AlternativeItem(string sessionType, WorkoutAlternative alternative)
+    {
+        SessionType = sessionType;
+        Name = alternative.Name;
+        How = alternative.How;
+    }
+
+    public string SessionType { get; }
+    public string Name { get; }
+    public string How { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HowButtonText))]
+    public partial bool ShowHow { get; set; }
+    public string HowButtonText => ShowHow ? "Hide" : "ⓘ How";
+
+    [RelayCommand]
+    void ToggleHow() => ShowHow = !ShowHow;
+}
+
 public partial class TodayViewModel : ObservableObject
 {
     public ITrackerStore Store;
@@ -99,6 +122,88 @@ public partial class TodayViewModel : ObservableObject
 
     [RelayCommand]
     void ToggleWorkoutGuide() => ShowWorkoutGuide = !ShowWorkoutGuide;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AlternativesButtonText))]
+    public partial bool ShowAlternatives { get; set; }
+    public string AlternativesButtonText => ShowAlternatives ? "Hide" : "⇄ Alternatives or swap a day";
+
+    [RelayCommand]
+    void ToggleAlternatives() => ShowAlternatives = !ShowAlternatives;
+
+    [ObservableProperty] public partial bool HasAlternativesSection { get; set; }
+    [ObservableProperty] public partial ObservableCollection<AlternativeItem> Alternatives { get; set; } = [];
+    [ObservableProperty] public partial bool HasAlternatives { get; set; }
+    [ObservableProperty] public partial string AlternativesIntro { get; set; } = "";
+
+    List<PlanSwap> swaps = [];
+    List<DateOnly> swapDays = [];
+    [ObservableProperty] public partial List<string> SwapOptions { get; set; } = [];
+    [ObservableProperty] public partial int SwapIndex { get; set; } = -1;
+    [ObservableProperty] public partial bool CanSwap { get; set; }
+    [ObservableProperty] public partial bool IsSwapped { get; set; }
+    [ObservableProperty] public partial string SwapNoteText { get; set; } = "";
+
+    /// <summary>The day's plan after swaps, its guide, and its alternatives.</summary>
+    async Task LoadPlanAsync(DateOnly day)
+    {
+        var week = WorkoutPlan.WeekStart(day);
+        swaps = await Store.GetPlanSwapsAsync(week, week.AddDays(6));
+        var planned = WorkoutPlan.PlannedFor(day, swaps);
+        IsSwapped = WorkoutPlan.IsSwapped(day, swaps);
+        SwapNoteText = IsSwapped ? WorkoutPlan.SwapNote(day, swaps) : "";
+        PlanText = planned == null
+            ? $"{day:dddd}: off. Rest day."
+            : $"{day:dddd}: {planned} (block {WorkoutPlan.Block(day)}, week {WorkoutPlan.WeekInBlock(day)})";
+        if (IsSwapped) PlanText += $"\n{SwapNoteText}";
+        TargetText = planned == null ? "" : WorkoutPlan.TargetFor(planned, day);
+        WorkoutGuideText = planned == null || planned == WorkoutPlan.Mobility ? "" : ExerciseGuide.SessionText(planned, day);
+        HasWorkoutGuide = WorkoutGuideText.Length > 0;
+        if (!HasWorkoutGuide) ShowWorkoutGuide = false;
+
+        var alternatives = WorkoutAlternatives.For(planned, day);
+        Alternatives = new ObservableCollection<AlternativeItem>(alternatives.Select(a => new AlternativeItem(planned!, a)));
+        HasAlternatives = Alternatives.Count > 0;
+        AlternativesIntro = planned == WorkoutPlan.Run
+            ? "Raining or too cold? Any of these at the same effort counts as today's run. Tap Log to record it."
+            : "Can't do it as planned? Either of these counts as today's session. Tap Log to record it.";
+
+        swapDays = WorkoutPlan.SwapOptions(day, swaps);
+        SwapIndex = -1;
+        SwapOptions = swapDays.Select(d => $"{d:dddd}: {WorkoutPlan.SessionName(WorkoutPlan.PlannedFor(d, swaps))}").ToList();
+        CanSwap = !IsSwapped && swapDays.Count > 0;
+        HasAlternativesSection = HasAlternatives || CanSwap || IsSwapped;
+        if (!HasAlternativesSection) ShowAlternatives = false;
+    }
+
+    /// <summary>Opens the workout form with the alternative picked, for the day shown.</summary>
+    [RelayCommand]
+    Task LogAlternativeAsync(AlternativeItem? item) => UiActions.RunAsync(Errors, "Opening workout", () =>
+    {
+        if (item == null) return Task.CompletedTask;
+        var day = DailyCheckIn.Key(DateOnly.FromDateTime(Date));
+        return Shell.Current.GoToAsync(
+            $"workout?type={Uri.EscapeDataString(item.SessionType)}&alt={Uri.EscapeDataString(item.Name)}&date={day}");
+    });
+
+    [RelayCommand]
+    Task SwapAsync() => UiActions.RunAsync(Errors, "Swapping days", async () =>
+    {
+        if (SwapIndex < 0 || SwapIndex >= swapDays.Count) throw new ArgumentException("Pick a day to swap with.");
+        var day = DateOnly.FromDateTime(Date);
+        await Store.SavePlanSwapsAsync(WorkoutPlan.Swap(day, swapDays[SwapIndex], swaps));
+        await LoadPlanAsync(day);
+        await RefreshRemindersAsync();
+    });
+
+    [RelayCommand]
+    Task UndoSwapAsync() => UiActions.RunAsync(Errors, "Undoing swap", async () =>
+    {
+        var day = DateOnly.FromDateTime(Date);
+        await Store.DeletePlanSwapsAsync(WorkoutPlan.UndoSwap(day, swaps));
+        await LoadPlanAsync(day);
+        await RefreshRemindersAsync();
+    });
     [ObservableProperty] public partial string WeatherText { get; set; } = "";
     [ObservableProperty] public partial string SavedText { get; set; } = "";
 
@@ -176,13 +281,7 @@ public partial class TodayViewModel : ObservableObject
         try
         {
             var day = DateOnly.FromDateTime(Date);
-            var planned = WorkoutPlan.PlannedFor(day.DayOfWeek);
-            PlanText = planned == null
-                ? $"{day:dddd}: off. Rest day."
-                : $"{day:dddd}: {planned} (block {WorkoutPlan.Block(day)}, week {WorkoutPlan.WeekInBlock(day)})";
-            TargetText = planned == null ? "" : WorkoutPlan.TargetFor(planned, day);
-            WorkoutGuideText = planned == null || planned == WorkoutPlan.Mobility ? "" : ExerciseGuide.SessionText(planned, day);
-            HasWorkoutGuide = WorkoutGuideText.Length > 0;
+            await LoadPlanAsync(day);
             MobilityLabel = day.DayOfWeek == DayOfWeek.Sunday ? "Sunday mobility routine done" : "Mobility routine done";
 
             var c = await Store.GetCheckInAsync(day);

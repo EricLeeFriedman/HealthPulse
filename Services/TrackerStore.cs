@@ -34,6 +34,11 @@ public interface ITrackerStore
     Task<List<FoodEntry>> GetFoodAsync(DateOnly from, DateOnly to);
     Task SaveFoodAsync(FoodEntry entry);
     Task DeleteFoodAsync(string id);
+
+    /// <summary>Day swaps with dates in the range.</summary>
+    Task<List<PlanSwap>> GetPlanSwapsAsync(DateOnly from, DateOnly to);
+    Task SavePlanSwapsAsync(IEnumerable<PlanSwap> swaps);
+    Task DeletePlanSwapsAsync(IEnumerable<string> dates);
 }
 
 public class LocalTrackerStore : ITrackerStore
@@ -65,6 +70,7 @@ public class LocalTrackerStore : ITrackerStore
             await Database.CreateTableAsync<FitnessTest>();
             await Database.CreateTableAsync<WeatherDay>();
             await Database.CreateTableAsync<FoodEntry>();
+            await Database.CreateTableAsync<PlanSwap>();
             initialized = true;
         }
         finally
@@ -262,5 +268,37 @@ public class LocalTrackerStore : ITrackerStore
     {
         await InitAsync();
         await Database.DeleteAsync<FoodEntry>(id);
+    }
+
+    public async Task<List<PlanSwap>> GetPlanSwapsAsync(DateOnly from, DateOnly to)
+    {
+        await InitAsync();
+        var start = DailyCheckIn.Key(from);
+        var end = DailyCheckIn.Key(to);
+        var all = await Database.Table<PlanSwap>().ToListAsync();
+        return all.Where(s => string.CompareOrdinal(s.Date, start) >= 0 && string.CompareOrdinal(s.Date, end) <= 0)
+            .OrderBy(s => s.Date, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    public async Task SavePlanSwapsAsync(IEnumerable<PlanSwap> swaps)
+    {
+        await InitAsync();
+        var list = swaps.ToList();
+        foreach (var swap in list) swap.UpdatedAt = DateTime.UtcNow;
+        await Database.RunInTransactionAsync(connection =>
+        {
+            foreach (var swap in list) connection.InsertOrReplace(swap);
+        });
+    }
+
+    public async Task DeletePlanSwapsAsync(IEnumerable<string> dates)
+    {
+        await InitAsync();
+        var list = dates.ToList();
+        await Database.RunInTransactionAsync(connection =>
+        {
+            foreach (var date in list) connection.Delete<PlanSwap>(date);
+        });
     }
 }

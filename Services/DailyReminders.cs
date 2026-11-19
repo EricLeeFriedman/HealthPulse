@@ -46,7 +46,7 @@ public static class DailyReminders
 
     /// <summary>What's still open for <paramref name="date"/>.</summary>
     public static List<ReminderTask> OpenTasks(DateOnly date, DailyCheckIn? checkIn,
-        IEnumerable<WorkoutSession> workouts, DateOnly? lastMeasured)
+        IEnumerable<WorkoutSession> workouts, DateOnly? lastMeasured, IEnumerable<PlanSwap>? swaps = null)
     {
         var tasks = new List<ReminderTask>();
         var logged = checkIn != null && checkIn.UpdatedAt != DateTime.MinValue;
@@ -61,7 +61,7 @@ public static class DailyReminders
             tasks.Add(new("preventives", $"Take preventives ({string.Join(", ", missing)})"));
         }
 
-        var planned = WorkoutPlan.PlannedFor(date.DayOfWeek);
+        var planned = WorkoutPlan.PlannedFor(date, swaps);
         if (planned != null && !WorkoutDone(planned, date, checkIn, workouts))
             tasks.Add(new("workout", planned == WorkoutPlan.Mobility ? "Do your mobility routine (steps on the Today tab)" : $"Do today's workout: {planned}"));
 
@@ -118,7 +118,8 @@ public static class DailyReminders
         DateOnly? lastMeasured = measurements.Count > 0
             ? DateOnly.FromDateTime(measurements.Max(m => m.Date))
             : null;
-        return OpenTasks(date, checkIn, workouts, lastMeasured);
+        var swaps = await store.GetPlanSwapsAsync(date, date);
+        return OpenTasks(date, checkIn, workouts, lastMeasured, swaps);
     }
 }
 

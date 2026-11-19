@@ -72,6 +72,84 @@ public static class WorkoutPlan
         _ => null
     };
 
+    /// <summary>
+    /// The planned session for a date after any day swaps, or null for a rest day.
+    /// </summary>
+    public static string? PlannedFor(DateOnly date, IEnumerable<PlanSwap>? swaps)
+    {
+        var key = DailyCheckIn.Key(date);
+        var swap = swaps?.LastOrDefault(s => s.Date == key);
+        if (swap == null) return PlannedFor(date.DayOfWeek);
+        return string.IsNullOrEmpty(swap.SessionType) ? null : swap.SessionType;
+    }
+
+    /// <summary>"Run" or "Rest" for showing a day's plan.</summary>
+    public static string SessionName(string? sessionType) => sessionType ?? "Rest";
+
+    /// <summary>
+    /// Days of the same week (Monday to Sunday) that <paramref name="date"/> can swap with:
+    /// every other day whose plan is different. Days already swapped are left out, so
+    /// a swap is undone before making another.
+    /// </summary>
+    public static List<DateOnly> SwapOptions(DateOnly date, IReadOnlyCollection<PlanSwap> swaps)
+    {
+        var mine = PlannedFor(date, swaps);
+        var weekStart = WeekStart(date);
+        var options = new List<DateOnly>();
+        for (var i = 0; i < 7; i++)
+        {
+            var other = weekStart.AddDays(i);
+            if (other == date || IsSwapped(other, swaps)) continue;
+            if (PlannedFor(other, swaps) == mine) continue;
+            options.Add(other);
+        }
+        return options;
+    }
+
+    public static bool IsSwapped(DateOnly date, IEnumerable<PlanSwap> swaps)
+    {
+        var key = DailyCheckIn.Key(date);
+        return swaps.Any(s => s.Date == key);
+    }
+
+    /// <summary>The two rows that swap the plans of <paramref name="a"/> and <paramref name="b"/>.</summary>
+    public static List<PlanSwap> Swap(DateOnly a, DateOnly b, IEnumerable<PlanSwap> swaps)
+    {
+        if (a == b) throw new ArgumentException("Pick a different day to swap with.");
+        if (WeekStart(a) != WeekStart(b)) throw new ArgumentException("Swaps stay within the same week.");
+        var list = swaps.ToList();
+        var planA = PlannedFor(a, list);
+        var planB = PlannedFor(b, list);
+        return
+        [
+            new PlanSwap { Date = DailyCheckIn.Key(a), SessionType = planB ?? "", SwappedWith = DailyCheckIn.Key(b) },
+            new PlanSwap { Date = DailyCheckIn.Key(b), SessionType = planA ?? "", SwappedWith = DailyCheckIn.Key(a) },
+        ];
+    }
+
+    /// <summary>The dates to clear to undo the swap that includes <paramref name="date"/>.</summary>
+    public static List<string> UndoSwap(DateOnly date, IEnumerable<PlanSwap> swaps)
+    {
+        var key = DailyCheckIn.Key(date);
+        var swap = swaps.FirstOrDefault(s => s.Date == key);
+        if (swap == null) return [];
+        return string.IsNullOrEmpty(swap.SwappedWith) ? [key] : [key, swap.SwappedWith];
+    }
+
+    /// <summary>"Swapped with Wed (was Run)" style note for a swapped day, or "".</summary>
+    public static string SwapNote(DateOnly date, IEnumerable<PlanSwap> swaps)
+    {
+        var key = DailyCheckIn.Key(date);
+        var swap = swaps.FirstOrDefault(s => s.Date == key);
+        if (swap == null) return "";
+        var was = SessionName(PlannedFor(date.DayOfWeek));
+        if (!DateOnly.TryParseExact(swap.SwappedWith, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var other))
+            return $"Changed from {was}.";
+        var otherName = other.ToString("dddd", System.Globalization.CultureInfo.InvariantCulture);
+        return $"Swapped with {otherName} (was {was}).";
+    }
+
     /// <summary>Monday of the week containing the date.</summary>
     public static DateOnly WeekStart(DateOnly date) =>
         date.AddDays(-(((int)date.DayOfWeek + 6) % 7));

@@ -95,6 +95,8 @@ public static class HealthSummaryBuilder
         54 => "rowing_machine",
         56 => "running",
         57 => "running_treadmill",
+        68 => "stair_climbing",
+        69 => "stair_climbing_machine",
         70 => "strength_training",
         71 => "stretching",
         74 => "swimming",

@@ -29,6 +29,22 @@ public static class WorkoutImporter
         _ => WorkoutPlan.Other
     };
 
+    /// <summary>
+    /// Indoor cardio from the watch that stands in for a run on a run day (rain, cold),
+    /// and the alternative name it is saved with.
+    /// </summary>
+    public static string? IndoorRunAlternative(string exerciseType) => exerciseType switch
+    {
+        "running_treadmill" => WorkoutAlternatives.Treadmill,
+        "stationary_biking" => WorkoutAlternatives.Bike,
+        "biking" => "Bike ride",
+        "stair_climbing" or "stair_climbing_machine" => WorkoutAlternatives.Stairs,
+        "elliptical" => "Elliptical",
+        "rowing_machine" => "Rowing machine",
+        "hiit" => "Indoor cardio",
+        _ => null
+    };
+
     public static bool IsLongEnough(string category, double minutes) => category switch
     {
         WorkoutPlan.Mobility => minutes >= MinMobilityMinutes,
@@ -40,9 +56,10 @@ public static class WorkoutImporter
     /// Which strength session a detected strength workout was: the day's planned one
     /// if it's a strength day, otherwise the first of A, B, C not yet done that week.
     /// </summary>
-    public static string StrengthSessionFor(DateTime start, IEnumerable<WorkoutSession> existing)
+    public static string StrengthSessionFor(DateTime start, IEnumerable<WorkoutSession> existing,
+        IEnumerable<PlanSwap>? swaps = null)
     {
-        var planned = WorkoutPlan.PlannedFor(start.DayOfWeek);
+        var planned = WorkoutPlan.PlannedFor(DateOnly.FromDateTime(start), swaps);
         if (planned != null && WorkoutPlan.IsStrength(planned)) return planned;
 
         var weekStart = WorkoutPlan.WeekStart(DateOnly.FromDateTime(start));
@@ -77,10 +94,23 @@ public static class WorkoutImporter
         var from = WorkoutPlan.WeekStart(DateOnly.FromDateTime(candidates[0].Session.Start));
         var to = DateOnly.FromDateTime(candidates[^1].Session.Start);
         var existing = await store.GetAllWorkoutsAsync(from, to);
+        var swaps = await store.GetPlanSwapsAsync(from, to.AddDays(6));
         var created = 0;
 
-        foreach (var (session, category) in candidates)
+        foreach (var (session, watchCategory) in candidates)
         {
+            var category = watchCategory;
+            string? alternative = null;
+            if (category == WorkoutPlan.Other && RunsIndoors(session, existing, swaps) is { } indoor)
+            {
+                category = WorkoutPlan.Run;
+                alternative = indoor;
+            }
+            else if (session.Type == "running_treadmill")
+            {
+                alternative = WorkoutAlternatives.Treadmill;
+            }
+
             var match = existing.FirstOrDefault(w => w.ExternalId == session.Id);
             var linked = false;
             if (match == null)
@@ -91,6 +121,7 @@ public static class WorkoutImporter
                 if (match != null)
                 {
                     match.ExternalId = session.Id;
+                    match.Alternative ??= alternative;
                     linked = true;
                 }
             }
@@ -106,7 +137,8 @@ public static class WorkoutImporter
             var workout = new WorkoutSession
             {
                 Date = session.Start,
-                SessionType = category == StrengthCategory ? StrengthSessionFor(session.Start, existing) : category!,
+                SessionType = category == StrengthCategory ? StrengthSessionFor(session.Start, existing, swaps) : category!,
+                Alternative = alternative,
                 Source = WorkoutSession.HealthConnectSource,
                 ExternalId = session.Id,
                 ExerciseType = session.Type,
@@ -118,6 +150,20 @@ public static class WorkoutImporter
             created++;
         }
         return created;
+    }
+
+    /// <summary>
+    /// The alternative name when an indoor cardio session falls on a run day that has no
+    /// run from the watch yet, so a rainy-day bike ride counts as the run. Otherwise null.
+    /// </summary>
+    static string? RunsIndoors(ExerciseSummary session, List<WorkoutSession> existing, List<PlanSwap> swaps)
+    {
+        if (IndoorRunAlternative(session.Type) is not { } alternative) return null;
+        var day = DateOnly.FromDateTime(session.Start);
+        if (WorkoutPlan.PlannedFor(day, swaps) != WorkoutPlan.Run) return null;
+        var watchRunToday = existing.Any(w => w.ExternalId != null && w.ExternalId != session.Id
+            && DateOnly.FromDateTime(w.Date) == day && w.SessionType == WorkoutPlan.Run);
+        return watchRunToday ? null : alternative;
     }
 
     /// <summary>Copies the watch's measurements onto the workout. Returns true when anything changed.</summary>

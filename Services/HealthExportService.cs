@@ -167,7 +167,8 @@ public class HealthExportService
             await store.GetMeasurementsAsync(from, today),
             await store.GetFitnessTestsAsync(from, today),
             await store.GetWeatherAsync(from, today),
-            await store.GetFoodAsync(from, today));
+            await store.GetFoodAsync(from, today),
+            await store.GetPlanSwapsAsync(from, today));
     }
 
     public static string BuildJson(
@@ -192,6 +193,7 @@ public class HealthExportService
         var measurements = trackers.Measurements.OrderBy(m => m.Date).ToList();
         var tests = trackers.FitnessTests.OrderBy(t => t.Date).ToList();
         var food = (trackers.Food ?? []).OrderBy(f => f.Time).ToList();
+        var swaps = trackers.Swaps ?? [];
 
         var days = new List<object>();
         for (var date = from; date <= to; date = date.AddDays(1))
@@ -232,7 +234,8 @@ public class HealthExportService
                 migraineMaxPain = dayMigraines.Count > 0 ? dayMigraines.Max(m => m.PeakSeverity) : (int?)null,
                 triptanTaken = dayMigraines.Any(m => m.TriptanTaken && m.TriptanTime.HasValue
                     && m.TriptanTime.Value >= dayStart && m.TriptanTime.Value < dayEnd) ? true : (bool?)null,
-                plannedSession = WorkoutPlan.PlannedFor(date.DayOfWeek) ?? "Off",
+                plannedSession = WorkoutPlan.PlannedFor(date, swaps) ?? "Off",
+                planSwap = WorkoutPlan.IsSwapped(date, swaps) ? WorkoutPlan.SwapNote(date, swaps) : null,
                 workouts = dayWorkouts.Count > 0 ? dayWorkouts.Select(x => x.SessionType) : null,
                 waistInches = Round(dayMeasurement?.WaistInches),
                 loggedWeightLbs = Round(dayMeasurement?.WeightLbs),
@@ -290,6 +293,7 @@ public class HealthExportService
             {
                 start = WorkoutPlan.PlanStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 weekly = "Mon Strength A, Tue Run, Wed Strength B, Thu Run, Fri Strength C, Sat off, Sun Mobility",
+                alternatives = "A workout's alternative (e.g. Treadmill, Stationary bike, Body-weight version) means it was done indoors or as a lighter version and still counts as its session. planSwap marks a day whose plan was swapped with another day of the same week; plannedSession is the plan after the swap.",
                 proteinTargetGrams = new[] { TrackerRules.ProteinMinGrams, TrackerRules.ProteinMaxGrams },
             },
             weeks = Weeks(from, to, workouts, trackers.CheckIns),
@@ -318,6 +322,7 @@ public class HealthExportService
                 id = x.Id,
                 start = x.Date,
                 type = x.SessionType,
+                alternative = x.Alternative,
                 source = x.IsDetected ? "watch" : "manual",
                 watchExerciseType = x.ExerciseType,
                 avgHeartRate = x.AvgHeartRate,
@@ -439,7 +444,8 @@ public record TrackerExport(
     List<BodyMeasurement> Measurements,
     List<FitnessTest> FitnessTests,
     List<WeatherDay> Weather,
-    List<FoodEntry>? Food = null)
+    List<FoodEntry>? Food = null,
+    List<PlanSwap>? Swaps = null)
 {
     public static TrackerExport Empty => new([], [], [], [], []);
 }
