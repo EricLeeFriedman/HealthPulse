@@ -49,6 +49,9 @@ public class TrackerExportTests
         Assert.Equal("12:05", checkIn.GetProperty("lastCaffeine").GetString());
         Assert.Equal("09:30", checkIn.GetProperty("firstMeal").GetString());
         Assert.Equal(2, checkIn.GetProperty("stress").GetInt32());
+        // A day saved as glasses only still reports ounces (8 oz per glass).
+        Assert.Equal(56, checkIn.GetProperty("waterOunces").GetInt32());
+        Assert.Equal(7, checkIn.GetProperty("waterGlasses").GetInt32());
         Assert.False(checkIn.GetProperty("allSupplements").GetBoolean());
         Assert.False(checkIn.GetProperty("supplements").GetProperty("magnesium").GetBoolean());
         Assert.Equal("Below", checkIn.GetProperty("proteinStatus").GetString());

@@ -146,7 +146,25 @@
                     <Label Text="Water, alcohol, stress" Style="{StaticResource CardTitle}" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <Label Text="{Binding WaterText}" VerticalOptions="Center" FontSize="15" />
-                        <Stepper Grid.Column="1" Minimum="0" Maximum="30" Increment="1" Value="{Binding WaterGlasses}" />
+                        <Label Grid.Column="1" Text="{Binding WaterStatus}" VerticalOptions="Center" Style="{StaticResource Muted}" />
+                    </Grid>
+                    <ProgressBar Progress="{Binding WaterProgress}" ProgressColor="#0F766E" />
+                    <Label Text="Tap to add (saves right away)" Style="{StaticResource Muted}" />
+                    <FlexLayout Wrap="Wrap" JustifyContent="Start" BindableLayout.ItemsSource="{Binding WaterAmounts}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="services:WaterAmount">
+                                <Button Text="{Binding Label}" Style="{StaticResource SecondaryButton}" Margin="0,0,6,6"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:TodayViewModel}}, Path=AddWaterAmountCommand, x:DataType=vm:TodayViewModel}"
+                                        CommandParameter="{Binding .}" />
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </FlexLayout>
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                        <Entry Text="{Binding CustomWaterOunces}" Placeholder="Other amount (oz)" Keyboard="Numeric" />
+                        <Button Grid.Column="1" Text="Add" Style="{StaticResource PrimaryButton}" Command="{Binding AddCustomWaterCommand}" />
+                        <Button Grid.Column="2" Text="Remove" Style="{StaticResource SecondaryButton}" Command="{Binding RemoveCustomWaterCommand}" />
+                        <Button Grid.Column="3" Text="Undo" Style="{StaticResource SecondaryButton}" Command="{Binding UndoWaterCommand}"
+                                IsVisible="{Binding CanUndoWater}" />
                     </Grid>
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <Label Text="{Binding AlcoholText}" VerticalOptions="Center" FontSize="15" />

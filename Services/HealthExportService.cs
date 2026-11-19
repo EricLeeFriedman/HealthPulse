@@ -243,6 +243,7 @@ public class HealthExportService
                 {
                     caffeineCups = c.CaffeineCups,
                     lastCaffeine = Clock(c.LastCaffeineTime),
+                    waterOunces = WaterLog.Ounces(c),
                     waterGlasses = c.WaterGlasses,
                     firstMeal = Clock(c.FirstMealTime),
                     alcoholDrinks = c.AlcoholDrinks,
