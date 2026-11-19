@@ -13,8 +13,11 @@ public class DailyCheckIn
     /// <summary>Local time of the last caffeinated drink.</summary>
     public TimeSpan? LastCaffeineTime { get; set; }
 
-    /// <summary>Glasses of water (about 8 oz / 250 ml each).</summary>
+    /// <summary>Water as 8 oz glasses. Kept in step with <see cref="WaterOunces"/> (rounded) for older readers.</summary>
     public int WaterGlasses { get; set; }
+
+    /// <summary>Water in fluid ounces; null for days saved before ounces were tracked (count 8 oz per glass).</summary>
+    public int? WaterOunces { get; set; }
 
     /// <summary>Local time of the first meal or snack of the day.</summary>
     public TimeSpan? FirstMealTime { get; set; }

@@ -34,7 +34,8 @@ public static class TrackerRules
             || !DateOnly.TryParseExact(checkIn.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
             throw new ArgumentException("Check-in needs a date.");
         if (checkIn.CaffeineCups is < 0 or > 20) throw new ArgumentException("Caffeine must be 0 to 20 cups.");
-        if (checkIn.WaterGlasses is < 0 or > 30) throw new ArgumentException("Water must be 0 to 30 glasses.");
+        if (checkIn.WaterGlasses < 0 || WaterLog.Ounces(checkIn) is < 0 or > WaterLog.MaxOunces)
+            throw new ArgumentException($"Water must be 0 to {WaterLog.MaxOunces} oz.");
         if (checkIn.AlcoholDrinks is < 0 or > 20) throw new ArgumentException("Alcohol must be 0 to 20 drinks.");
         if (checkIn.Stress is < 1 or > 5) throw new ArgumentException("Stress must be 1 to 5.");
         if (checkIn.ProteinGrams is < 0 or > 500) throw new ArgumentException("Protein must be 0 to 500 g.");

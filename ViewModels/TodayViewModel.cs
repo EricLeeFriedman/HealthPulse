@@ -214,10 +214,59 @@ public partial class TodayViewModel : ObservableObject
     [ObservableProperty] public partial bool HasLastCaffeine { get; set; }
     [ObservableProperty] public partial TimeSpan LastCaffeineTime { get; set; } = new(12, 0, 0);
 
+    /// <summary>The day's water in fluid ounces.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(WaterText))]
-    public partial double WaterGlasses { get; set; }
-    public string WaterText => $"Water: {(int)WaterGlasses} glass{((int)WaterGlasses == 1 ? "" : "es")} (8 oz)";
+    [NotifyPropertyChangedFor(nameof(WaterText), nameof(WaterStatus), nameof(WaterProgress))]
+    public partial int WaterOunces { get; set; }
+    public string WaterText => WaterLog.Text(WaterOunces);
+    public string WaterStatus => WaterLog.Status(WaterOunces);
+    public double WaterProgress => Math.Min(1.0, WaterOunces / (double)WaterLog.TargetOunces);
+    public IReadOnlyList<WaterAmount> WaterAmounts { get; } = WaterLog.QuickAmounts;
+    [ObservableProperty] public partial string CustomWaterOunces { get; set; } = "";
+
+    /// <summary>Amounts added since the day was loaded, so the last one can be undone.</summary>
+    readonly Stack<int> waterAdds = new();
+    [ObservableProperty] public partial bool CanUndoWater { get; set; }
+
+    /// <summary>Adds water and saves the check-in, so a tap is never lost.</summary>
+    Task ChangeWaterAsync(int ounces) => UiActions.RunAsync(Errors, "Saving water", async () =>
+    {
+        var before = WaterOunces;
+        WaterOunces = WaterLog.Add(WaterOunces, ounces);
+        var applied = WaterOunces - before;
+        if (applied == 0) return;
+        waterAdds.Push(applied);
+        CanUndoWater = true;
+        await SaveCheckInAsync(BuildCheckIn());
+    });
+
+    [RelayCommand]
+    Task AddWaterAmountAsync(WaterAmount? amount) => amount == null ? Task.CompletedTask : ChangeWaterAsync(amount.Ounces);
+
+    [RelayCommand]
+    Task AddCustomWaterAsync() => UiActions.RunAsync(Errors, "Adding water", async () =>
+    {
+        var ounces = WaterLog.ParseOunces(CustomWaterOunces);
+        CustomWaterOunces = "";
+        await ChangeWaterAsync(ounces);
+    });
+
+    [RelayCommand]
+    Task RemoveCustomWaterAsync() => UiActions.RunAsync(Errors, "Removing water", async () =>
+    {
+        var ounces = WaterLog.ParseOunces(CustomWaterOunces);
+        CustomWaterOunces = "";
+        await ChangeWaterAsync(-ounces);
+    });
+
+    [RelayCommand]
+    Task UndoWaterAsync() => UiActions.RunAsync(Errors, "Undoing water", async () =>
+    {
+        if (waterAdds.Count == 0) return;
+        WaterOunces = WaterLog.Add(WaterOunces, -waterAdds.Pop());
+        CanUndoWater = waterAdds.Count > 0;
+        await SaveCheckInAsync(BuildCheckIn());
+    });
 
     [ObservableProperty] public partial bool HasFirstMeal { get; set; }
     [ObservableProperty] public partial TimeSpan FirstMealTime { get; set; } = new(12, 0, 0);
@@ -316,7 +365,9 @@ public partial class TodayViewModel : ObservableObject
             CaffeineCups = c.CaffeineCups;
             HasLastCaffeine = c.LastCaffeineTime.HasValue;
             LastCaffeineTime = c.LastCaffeineTime ?? new TimeSpan(12, 0, 0);
-            WaterGlasses = c.WaterGlasses;
+            WaterOunces = WaterLog.Ounces(c);
+            waterAdds.Clear();
+            CanUndoWater = false;
             HasFirstMeal = c.FirstMealTime.HasValue;
             FirstMealTime = c.FirstMealTime ?? new TimeSpan(12, 0, 0);
             AlcoholDrinks = c.AlcoholDrinks;
@@ -425,12 +476,18 @@ public partial class TodayViewModel : ObservableObject
             : $"{meals.Count} entr{(meals.Count == 1 ? "y" : "ies")}"  + ". Tap one to edit or delete it.";
     }
 
-    DailyCheckIn BuildCheckIn() => new()
+    DailyCheckIn BuildCheckIn()
+    {
+        var checkIn = BuildCheckInFields();
+        WaterLog.Set(checkIn, WaterOunces);
+        return checkIn;
+    }
+
+    DailyCheckIn BuildCheckInFields() => new()
     {
         Date = DailyCheckIn.Key(DateOnly.FromDateTime(Date)),
         CaffeineCups = (int)CaffeineCups,
         LastCaffeineTime = HasLastCaffeine ? LastCaffeineTime : null,
-        WaterGlasses = (int)WaterGlasses,
         FirstMealTime = HasFirstMeal ? FirstMealTime : null,
         AlcoholDrinks = (int)AlcoholDrinks,
         Stress = StressIndex > 0 ? StressIndex : null,
