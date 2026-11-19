@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:HealthPulse.ViewModels"
              xmlns:models="clr-namespace:HealthPulse.Models"
+             xmlns:services="clr-namespace:HealthPulse.Services"
              x:Class="HealthPulse.Views.TodayPage"
              x:DataType="vm:TodayViewModel"
              Title="Today"
@@ -102,6 +103,18 @@
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="8">
                     <Label Text="Food log" Style="{StaticResource CardTitle}" />
+                    <VerticalStackLayout Spacing="6" IsVisible="{Binding HasFrequentFoods}">
+                        <Label Text="Frequent foods (tap to fill in, then Add)" Style="{StaticResource Muted}" />
+                        <FlexLayout Wrap="Wrap" JustifyContent="Start" BindableLayout.ItemsSource="{Binding FrequentFoodsList}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="services:FrequentFood">
+                                    <Button Text="{Binding Display}" Style="{StaticResource SecondaryButton}" Margin="0,0,6,6"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:TodayViewModel}}, Path=PickFrequentFoodCommand, x:DataType=vm:TodayViewModel}"
+                                            CommandParameter="{Binding .}" />
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </FlexLayout>
+                    </VerticalStackLayout>
                     <Editor Text="{Binding NewFoodText}" Placeholder="What did you eat? e.g. 3 eggs, 1 slice toast, big latte" AutoSize="TextChanges" MaxLength="500" />
                     <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
                         <TimePicker Time="{Binding NewFoodTime}" />
