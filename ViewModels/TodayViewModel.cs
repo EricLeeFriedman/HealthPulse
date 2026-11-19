@@ -263,6 +263,34 @@ public partial class TodayViewModel : ObservableObject
         EditingFood = null;
         NewFoodText = "";
         NewFoodTime = ClockNow.Time(DateTime.Now);
+        pickedFood = null;
+    }
+
+    /// <summary>Foods logged most often recently, most frequent first. Rebuilt after every add, edit or delete.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFrequentFoods))]
+    public partial ObservableCollection<FrequentFood> FrequentFoodsList { get; set; } = [];
+    public bool HasFrequentFoods => FrequentFoodsList.Count > 0;
+
+    /// <summary>The quick pick behind the current text, so its protein is kept if the text isn't changed.</summary>
+    FrequentFood? pickedFood;
+
+    /// <summary>Tap a frequent food to fill in a new entry with it, timed now.</summary>
+    [RelayCommand]
+    void PickFrequentFood(FrequentFood? food)
+    {
+        if (food == null) return;
+        EditingFood = null;
+        NewFoodText = food.Text;
+        NewFoodTime = ClockNow.Time(DateTime.Now);
+        pickedFood = food;
+    }
+
+    async Task LoadFrequentFoodsAsync()
+    {
+        var (from, to) = FrequentFoods.Window(DateTime.Now);
+        var entries = await Store.GetFoodAsync(from, to);
+        FrequentFoodsList = new ObservableCollection<FrequentFood>(FrequentFoods.Build(entries));
     }
 
     [ObservableProperty] public partial bool MobilityDone { get; set; }
@@ -305,6 +333,7 @@ public partial class TodayViewModel : ObservableObject
                 : $"Saved {DateTime.SpecifyKind(c.UpdatedAt, DateTimeKind.Utc).ToLocalTime():h:mm tt}";
 
             await LoadMealsAsync(day);
+            await LoadFrequentFoodsAsync();
             NewFoodTime = ClockNow.Time(DateTime.Now);
 
             await RefreshWeatherTextAsync(day);
@@ -439,10 +468,15 @@ public partial class TodayViewModel : ObservableObject
         var entry = EditingFood ?? new FoodEntry();
         entry.Time = Date.Date + NewFoodTime;
         entry.Text = NewFoodText;
+        if (EditingFood == null && pickedFood?.ProteinGrams is { } protein
+            && FrequentFoods.Key(NewFoodText) == FrequentFoods.Key(pickedFood.Text))
+            entry.ProteinGrams = protein;
         await Store.SaveFoodAsync(entry);
         EditingFood = null;
         NewFoodText = "";
+        pickedFood = null;
         await LoadMealsAsync(DateOnly.FromDateTime(Date));
+        await LoadFrequentFoodsAsync();
         await ApplyMealsAsync();
     });
 
@@ -455,6 +489,7 @@ public partial class TodayViewModel : ObservableObject
         if (choice == "Edit")
         {
             EditingFood = entry;
+            pickedFood = null;
             NewFoodText = entry.Text;
             NewFoodTime = entry.Time.TimeOfDay;
         }
@@ -463,6 +498,7 @@ public partial class TodayViewModel : ObservableObject
             await Store.DeleteFoodAsync(entry.Id);
             if (EditingFood?.Id == entry.Id) CancelFoodEdit();
             await LoadMealsAsync(DateOnly.FromDateTime(Date));
+            await LoadFrequentFoodsAsync();
             await ApplyMealsAsync();
         }
     });

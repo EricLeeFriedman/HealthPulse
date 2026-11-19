@@ -43,6 +43,7 @@
     <Compile Include="..\..\Services\ExerciseGuide.cs" Link="App\ExerciseGuide.cs" />
     <Compile Include="..\..\Services\WorkoutAlternatives.cs" Link="App\WorkoutAlternatives.cs" />
     <Compile Include="..\..\Services\ClockNow.cs" Link="App\ClockNow.cs" />
+    <Compile Include="..\..\Services\FrequentFoods.cs" Link="App\FrequentFoods.cs" />
   </ItemGroup>
 
   <ItemGroup>
