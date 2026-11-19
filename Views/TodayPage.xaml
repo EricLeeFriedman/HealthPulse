@@ -23,6 +23,38 @@
                             Command="{Binding ToggleWorkoutGuideCommand}" IsVisible="{Binding HasWorkoutGuide}" />
                     <Label Text="{Binding WorkoutGuideText}" IsVisible="{Binding ShowWorkoutGuide}"
                            FontSize="14" TextColor="#374151" LineHeight="1.3" />
+                    <Button Text="{Binding AlternativesButtonText}" Style="{StaticResource SecondaryButton}"
+                            Command="{Binding ToggleAlternativesCommand}" IsVisible="{Binding HasAlternativesSection}" />
+                    <VerticalStackLayout Spacing="8" IsVisible="{Binding ShowAlternatives}">
+                        <Label Text="{Binding AlternativesIntro}" Style="{StaticResource Muted}" IsVisible="{Binding HasAlternatives}" />
+                        <VerticalStackLayout Spacing="8" BindableLayout.ItemsSource="{Binding Alternatives}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:AlternativeItem">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                            <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold" TextColor="#0F766E" VerticalOptions="Center" />
+                                            <Button Grid.Column="1" Text="{Binding HowButtonText}" Style="{StaticResource SecondaryButton}"
+                                                    Padding="12,4" Command="{Binding ToggleHowCommand}" />
+                                            <Button Grid.Column="2" Text="Log" Style="{StaticResource SecondaryButton}" Padding="12,4"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:TodayViewModel}}, Path=LogAlternativeCommand, x:DataType=vm:TodayViewModel}"
+                                                    CommandParameter="{Binding .}" />
+                                        </Grid>
+                                        <Label Text="{Binding How}" IsVisible="{Binding ShowHow}"
+                                               FontSize="14" TextColor="#374151" LineHeight="1.3" />
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Label Text="Or swap with another day this week" Style="{StaticResource Muted}" IsVisible="{Binding CanSwap}" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding CanSwap}">
+                            <Picker ItemsSource="{Binding SwapOptions}" SelectedIndex="{Binding SwapIndex}" Title="Pick a day" />
+                            <Button Grid.Column="1" Text="Swap" Style="{StaticResource SecondaryButton}" Command="{Binding SwapCommand}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding IsSwapped}">
+                            <Label Text="{Binding SwapNoteText}" FontSize="14" TextColor="#374151" VerticalOptions="Center" />
+                            <Button Grid.Column="1" Text="Undo swap" Style="{StaticResource SecondaryButton}" Command="{Binding UndoSwapCommand}" />
+                        </Grid>
+                    </VerticalStackLayout>
                     <Label Text="{Binding WeatherText}" FontSize="14" TextColor="#374151" />
                 </VerticalStackLayout>
             </Border>

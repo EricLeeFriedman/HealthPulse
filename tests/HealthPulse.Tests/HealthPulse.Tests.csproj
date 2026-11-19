@@ -41,6 +41,7 @@
     <Compile Include="..\..\Services\DailyReminders.cs" Link="App\DailyReminders.cs" />
     <Compile Include="..\..\Services\MeasureHistory.cs" Link="App\MeasureHistory.cs" />
     <Compile Include="..\..\Services\ExerciseGuide.cs" Link="App\ExerciseGuide.cs" />
+    <Compile Include="..\..\Services\WorkoutAlternatives.cs" Link="App\WorkoutAlternatives.cs" />
     <Compile Include="..\..\Services\ClockNow.cs" Link="App\ClockNow.cs" />
   </ItemGroup>
 

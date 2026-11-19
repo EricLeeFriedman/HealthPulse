@@ -21,6 +21,12 @@
                         <Button Grid.Column="2" Text="Now" Style="{StaticResource SecondaryButton}" Command="{Binding SessionNowCommand}" />
                     </Grid>
                     <Label Text="{Binding TargetText}" Style="{StaticResource Muted}" />
+                    <VerticalStackLayout Spacing="4" IsVisible="{Binding HasAlternatives}">
+                        <Label Text="Done as (an alternative still counts as this session)" Style="{StaticResource Muted}" />
+                        <Picker ItemsSource="{Binding AlternativeOptions}" SelectedIndex="{Binding AlternativeIndex}" Title="Done as" />
+                        <Label Text="{Binding AlternativeHow}" IsVisible="{Binding HasAlternativeHow}"
+                               FontSize="14" TextColor="#374151" LineHeight="1.3" />
+                    </VerticalStackLayout>
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                         <Entry Text="{Binding Duration}" Keyboard="Numeric" Placeholder="Minutes" />
                         <Entry Grid.Column="1" Text="{Binding Distance}" Keyboard="Numeric" Placeholder="Miles" IsVisible="{Binding IsRun}" />

@@ -81,6 +81,12 @@ public class WorkoutSession
     /// <summary>A detected workout the user deleted; kept so it isn't imported again.</summary>
     public bool Hidden { get; set; }
 
+    /// <summary>
+    /// How the session was done when not as planned, e.g. "Treadmill" for a run on a rainy day.
+    /// It still counts as the planned session.
+    /// </summary>
+    public string? Alternative { get; set; }
+
     public const string ManualSource = "manual";
     public const string HealthConnectSource = "health_connect";
 
@@ -98,7 +104,8 @@ public class WorkoutSession
     {
         get
         {
-            var parts = new List<string> { IsDetected ? $"⌚ {SessionType}" : SessionType };
+            var name = string.IsNullOrEmpty(Alternative) ? SessionType : $"{SessionType} ({Alternative.ToLowerInvariant()})";
+            var parts = new List<string> { IsDetected ? $"⌚ {name}" : name };
             if (DurationMinutes.HasValue) parts.Add($"{DurationMinutes} min");
             if (DistanceMiles.HasValue) parts.Add($"{DistanceMiles:0.##} mi");
             if (AvgHeartRate.HasValue) parts.Add($"avg {AvgHeartRate:0} bpm");
@@ -107,6 +114,25 @@ public class WorkoutSession
             return string.Join(" • ", parts);
         }
     }
+}
+
+/// <summary>
+/// One side of a swap between two days of the same week: on <see cref="Date"/> the plan
+/// becomes <see cref="SessionType"/> ("" for a rest day). Swaps are saved in pairs.
+/// </summary>
+public class PlanSwap
+{
+    /// <summary>Local date, yyyy-MM-dd.</summary>
+    [PrimaryKey]
+    public string Date { get; set; } = "";
+
+    /// <summary>The session planned for this date after the swap, or "" for rest.</summary>
+    public string SessionType { get; set; } = "";
+
+    /// <summary>The other day of the swap, yyyy-MM-dd.</summary>
+    public string SwappedWith { get; set; } = "";
+
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>One set of one exercise in a workout.</summary>

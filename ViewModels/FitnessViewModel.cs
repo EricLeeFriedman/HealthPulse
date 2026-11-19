@@ -80,10 +80,11 @@ public partial class FitnessViewModel : ObservableObject
             var checkIns = await Store.GetCheckInsAsync(weekStart, today);
             WeekText = WorkoutPlan.Progress(weekStart, workouts, checkIns).Text;
 
-            var planned = WorkoutPlan.PlannedFor(today.DayOfWeek);
+            var swaps = await Store.GetPlanSwapsAsync(today, today);
+            var planned = WorkoutPlan.PlannedFor(today, swaps);
             var doneToday = workouts.Any(w => DateOnly.FromDateTime(w.Date) == today);
             TodayText = planned == null
-                ? "Today: off (Saturday)."
+                ? $"Today: rest.{(WorkoutPlan.IsSwapped(today, swaps) ? " " + WorkoutPlan.SwapNote(today, swaps) : "")}"
                 : $"Today: {planned}{(doneToday ? " ✓ logged" : "")} • block {WorkoutPlan.Block(today)}, week {WorkoutPlan.WeekInBlock(today)}";
             TargetText = planned == null ? "" : WorkoutPlan.TargetFor(planned, today);
             Workouts = new ObservableCollection<WorkoutSession>(workouts.OrderByDescending(w => w.Date));

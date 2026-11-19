@@ -110,11 +110,64 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
 
     bool started;
 
-    public void ApplyQueryAttributes(IDictionary<string, object> query) =>
-        _ = LoadAsync(query.TryGetValue("id", out var value) && value is string id ? Uri.UnescapeDataString(id) : null);
+    public const string AsPlanned = "As planned";
 
-    /// <summary>Loads once: from the "id" query when editing, or a new workout for today's plan.</summary>
-    public async Task LoadAsync(string? id)
+    [ObservableProperty] public partial List<string> AlternativeOptions { get; set; } = [AsPlanned];
+    [ObservableProperty] public partial int AlternativeIndex { get; set; }
+    [ObservableProperty] public partial bool HasAlternatives { get; set; }
+    [ObservableProperty] public partial string AlternativeHow { get; set; } = "";
+    [ObservableProperty] public partial bool HasAlternativeHow { get; set; }
+
+    string? SelectedAlternative =>
+        AlternativeIndex > 0 && AlternativeIndex < AlternativeOptions.Count ? AlternativeOptions[AlternativeIndex] : null;
+
+    partial void OnAlternativeIndexChanged(int value) => ShowAlternativeHow();
+
+    void ShowAlternativeHow()
+    {
+        var name = SelectedAlternative;
+        AlternativeHow = name == null
+            ? ""
+            : WorkoutAlternatives.For(SelectedType, DateOnly.FromDateTime(Date)).FirstOrDefault(a => a.Name == name)?.How ?? "";
+        HasAlternativeHow = AlternativeHow.Length > 0;
+    }
+
+    /// <summary>
+    /// Fills the "Done as" picker for the session type, keeping <paramref name="keep"/> selected.
+    /// A saved name that isn't a listed option (e.g. "Elliptical" from the watch) is added when
+    /// <paramref name="keepUnknown"/> is set.
+    /// </summary>
+    void BuildAlternatives(string? keep, bool keepUnknown = false)
+    {
+        var options = new List<string> { AsPlanned };
+        options.AddRange(WorkoutAlternatives.NamesFor(SelectedType, DateOnly.FromDateTime(Date)));
+        if (!string.IsNullOrEmpty(keep) && !options.Contains(keep))
+        {
+            if (keepUnknown) options.Add(keep);
+            else keep = null;
+        }
+        AlternativeIndex = -1;
+        AlternativeOptions = options;
+        AlternativeIndex = string.IsNullOrEmpty(keep) ? 0 : options.IndexOf(keep);
+        HasAlternatives = options.Count > 1;
+        ShowAlternativeHow();
+    }
+
+    static string? Query(IDictionary<string, object> query, string key) =>
+        query.TryGetValue(key, out var value) && value is string text ? Uri.UnescapeDataString(text) : null;
+
+    public void ApplyQueryAttributes(IDictionary<string, object> query)
+    {
+        DateOnly? date = DateOnly.TryParseExact(Query(query, "date") ?? "", "yyyy-MM-dd", CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out var parsed) ? parsed : null;
+        _ = LoadAsync(Query(query, "id"), Query(query, "type"), Query(query, "alt"), date);
+    }
+
+    /// <summary>
+    /// Loads once: from the "id" query when editing, or a new workout for the day's plan
+    /// (or the given session type and alternative, from the Today tab).
+    /// </summary>
+    public async Task LoadAsync(string? id, string? type = null, string? alternative = null, DateOnly? date = null)
     {
         if (started) return;
         started = true;
@@ -146,11 +199,23 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
                 }
                 building = false;
                 BuildExercises(existing.Sets);
+                BuildAlternatives(existing.Alternative, keepUnknown: true);
             }
             else
             {
                 session = new WorkoutSession();
-                TypeIndex = SessionTypes.IndexOf(WorkoutPlan.PlannedFor(today.DayOfWeek) ?? WorkoutPlan.Other);
+                var day = date ?? today;
+                building = true;
+                if (day != today)
+                {
+                    Date = day.ToDateTime(TimeOnly.MinValue);
+                    Clock = new TimeSpan(12, 0, 0);
+                }
+                building = false;
+                var swaps = await Store.GetPlanSwapsAsync(day, day);
+                var planned = type != null && SessionTypes.Contains(type) ? type : WorkoutPlan.PlannedFor(day, swaps);
+                TypeIndex = SessionTypes.IndexOf(planned ?? WorkoutPlan.Other);
+                BuildAlternatives(alternative, keepUnknown: true);
             }
         }
         catch (Exception exception)
@@ -161,12 +226,16 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
 
     partial void OnTypeIndexChanged(int value)
     {
-        if (!building) BuildExercises([]);
+        if (building) return;
+        BuildExercises([]);
+        BuildAlternatives(SelectedAlternative);
     }
 
     partial void OnDateChanged(DateTime value)
     {
-        if (!building && !IsExisting) BuildExercises([]);
+        if (building || IsExisting) return;
+        BuildExercises([]);
+        BuildAlternatives(SelectedAlternative);
     }
 
     void BuildExercises(IReadOnlyList<WorkoutSet> saved)
@@ -235,6 +304,7 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
         session.DurationMinutes = TrackerRules.ParseInt(Duration, "Duration");
         session.DistanceMiles = TrackerRules.ParseDouble(Distance, "Distance");
         session.Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim();
+        session.Alternative = SelectedAlternative;
         session.Sets = WorkoutForm.BuildSets(Exercises.SelectMany(e =>
             e.Sets.Select(s => new SetInput(e.Name, e.Template.Timed, s.Amount, s.Weight))));
         await Store.SaveWorkoutAsync(session);
