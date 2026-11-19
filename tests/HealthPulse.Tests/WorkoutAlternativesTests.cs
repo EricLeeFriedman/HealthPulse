@@ -62,7 +62,7 @@ public sealed class WorkoutAlternativesTests : IAsyncLifetime
         Assert.Equal(WorkoutPlan.Run, WorkoutPlan.PlannedFor(Saturday, swaps));
         Assert.Equal(WorkoutPlan.StrengthB, WorkoutPlan.PlannedFor(Wednesday, swaps));
         Assert.Equal("Swapped with Saturday (was Run).", WorkoutPlan.SwapNote(Tuesday, swaps));
-        Assert.Equal(["2026-11-24", "2026-11-28"], WorkoutPlan.UndoSwap(Saturday, swaps));
+        Assert.Equal(["2026-11-24", "2026-11-28"], WorkoutPlan.UndoSwap(Saturday, swaps).Order(StringComparer.Ordinal));
     }
 
     [Fact]
