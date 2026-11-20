@@ -59,6 +59,20 @@ public class SharedHealthDataTests
     }
 
     [Fact]
+    public async Task ExerciseReadForSyncSkipsTheCache()
+    {
+        var inner = new CountingHealth();
+        var shared = new SharedHealthData(inner);
+        await shared.GetDailySummariesAsync(Today.AddDays(-13), Today);
+
+        var read = await shared.GetExerciseSessionsAsync(Today.AddDays(-13), Today);
+
+        Assert.True(read.CanRead);
+        Assert.Equal(2, inner.Calls);
+        Assert.Equal(Today.AddDays(-13), inner.LastRange.From);
+    }
+
+    [Fact]
     public async Task SmallReadIsWidenedToNinetyDaysAndSliced()
     {
         var inner = new CountingHealth();

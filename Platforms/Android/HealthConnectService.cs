@@ -121,20 +121,45 @@ public class HealthConnectService : IHealthDataService
         var start = from.ToDateTime(TimeOnly.MinValue);
         var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
 
-        // Most useful first, so a slow phone still exports sleep and steps.
+        // Quick reads first. Daily heart rate takes most of the budget (55 s for 90 days on a
+        // real phone), so it goes last; before, it left no time for exercise, HRV and weight.
         if (granted.Contains(ReadSleep))
             await report.RunAsync("sleep", () => ReadSleepAsync(start, end, summaries, report));
-        await report.RunAsync("steps and heart rate", () => ReadDailyAggregatesAsync(granted, start, end, summaries, report));
         if (granted.Contains(ReadExercise))
             await report.RunAsync("exercise", () => ReadExerciseAsync(granted, start, end, summaries, report));
         if (granted.Contains(ReadHrv))
             await report.RunAsync("hrv", () => ReadHrvAsync(start, end, summaries));
         if (granted.Contains(ReadWeight))
             await report.RunAsync("weight", () => ReadWeightAsync(start, end, summaries));
+        await report.RunAsync("steps and heart rate", () => ReadDailyAggregatesAsync(granted, start, end, summaries, report));
 
         foreach (var step in report.Steps)
             Logger.LogInformation("Health Connect {Step}", step);
         return summaries.Values.OrderBy(s => s.Date).ToList();
+    }
+
+    /// <summary>Time for Sync watch's exercise-only read, including per-session heart rate.</summary>
+    public static readonly TimeSpan ExerciseReadBudget = TimeSpan.FromSeconds(40);
+
+    public async Task<ExerciseRead> GetExerciseSessionsAsync(DateOnly from, DateOnly to)
+    {
+        if (GetAvailability() != HealthDataAvailability.Available) return new ExerciseRead(false, []);
+        var granted = await GetGrantedPermissionsAsync();
+        if (!granted.Contains(ReadExercise))
+        {
+            Logger.LogInformation("Sync watch: exercise permission not granted");
+            return new ExerciseRead(false, []);
+        }
+
+        var summaries = HealthSummaryBuilder.CreateDays(from, to);
+        var report = new HealthReadReport(ExerciseReadBudget);
+        report.Note($"sync watch {from:yyyy-MM-dd} to {to:yyyy-MM-dd}");
+        // Not wrapped in report.RunAsync: a failed read must reach the Fitness tab as an error.
+        await ReadExerciseAsync(granted, from.ToDateTime(TimeOnly.MinValue), to.AddDays(1).ToDateTime(TimeOnly.MinValue),
+            summaries, report);
+        foreach (var step in report.Steps)
+            Logger.LogInformation("Health Connect {Step}", step);
+        return new ExerciseRead(true, summaries.Values.SelectMany(d => d.Exercise).ToList());
     }
 
     // ---------------------------------------------------------------------

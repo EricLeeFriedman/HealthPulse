@@ -35,13 +35,17 @@ public partial class FitnessViewModel : ObservableObject
                 SyncText = "Connect Health Connect on the Health tab so workouts from your watch show up here automatically.";
                 return;
             }
+            if (force) SyncText = "Checking Health Connect for workouts from your watch…";
             var today = DateOnly.FromDateTime(DateTime.Today);
-            var days = await HealthData.GetDailySummariesAsync(today.AddDays(-13), today);
-            var added = await WorkoutImporter.ImportAsync(Store, days.SelectMany(d => d.Exercise));
+            var read = await HealthData.GetExerciseSessionsAsync(today.AddDays(-13), today);
+            if (!read.CanRead)
+            {
+                SyncText = "HealthPulse isn't allowed to read workouts. In Health Connect, open App permissions › HealthPulse and turn on Exercise, then tap Sync watch again.";
+                return;
+            }
+            var result = await WorkoutImporter.ImportDetailedAsync(Store, read.Sessions);
             lastSync = DateTime.Now;
-            SyncText = added > 0
-                ? $"Added {added} workout{(added == 1 ? "" : "s")} from your watch. Tap one to add sets and weights (optional)."
-                : $"Workouts from your watch sync automatically. Last checked {DateTime.Now:h:mm tt}.";
+            SyncText = WorkoutImporter.SyncSummary(result, read.Sessions, DateTime.Now);
         }
         catch (Exception exception)
         {
