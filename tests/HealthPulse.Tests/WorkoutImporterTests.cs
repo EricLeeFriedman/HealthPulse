@@ -205,6 +205,7 @@ public sealed class WorkoutImporterTests : IAsyncLifetime
         var walk = Session("hc-1", "walking", Monday9am, 25);
         var oldRun = Session("hc-2", "running", Monday9am.AddDays(-2), 20);
         oldRun.Title = "Run";
+        await WorkoutImporter.ImportDetailedAsync(store, [oldRun]); // synced on Saturday
         var result = await WorkoutImporter.ImportDetailedAsync(store, [walk, oldRun]);
 
         var text = WorkoutImporter.SyncSummary(result, [walk, oldRun], Monday9am.AddHours(1));
