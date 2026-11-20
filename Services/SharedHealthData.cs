@@ -33,6 +33,10 @@ public class SharedHealthData : IHealthDataService
     public Task<bool> HasPermissionsAsync() => inner.HasPermissionsAsync();
     public IReadOnlyList<string> LastReadSteps => inner.LastReadSteps;
 
+    /// <summary>Always a fresh, exercise-only read, so Sync watch sees a session recorded a minute ago.</summary>
+    public Task<ExerciseRead> GetExerciseSessionsAsync(DateOnly from, DateOnly to) =>
+        inner.GetExerciseSessionsAsync(from, to);
+
     public async Task<bool> RequestPermissionsAsync()
     {
         Invalidate();

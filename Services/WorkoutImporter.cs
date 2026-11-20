@@ -81,21 +81,33 @@ public static class WorkoutImporter
     /// the same kind on the same day is linked instead of duplicated. Returns the number
     /// of new workouts.
     /// </summary>
-    public static async Task<int> ImportAsync(ITrackerStore store, IEnumerable<ExerciseSummary> sessions)
+    public static async Task<int> ImportAsync(ITrackerStore store, IEnumerable<ExerciseSummary> sessions) =>
+        (await ImportDetailedAsync(store, sessions)).Created.Count;
+
+    /// <summary>
+    /// Like <see cref="ImportAsync"/>, but says what happened to each session: added as a new
+    /// workout, linked to one logged by hand, or skipped (too short, or deleted earlier).
+    /// </summary>
+    public static async Task<WorkoutImportResult> ImportDetailedAsync(ITrackerStore store, IEnumerable<ExerciseSummary> sessions)
     {
-        var candidates = sessions
-            .Where(s => !string.IsNullOrEmpty(s.Id))
+        var result = new WorkoutImportResult();
+        var all = sessions.Where(s => !string.IsNullOrEmpty(s.Id)).ToList();
+        foreach (var session in all)
+        {
+            if (CategoryFor(session.Type) is { } c && !IsLongEnough(c, session.Minutes))
+                result.TooShort.Add(session);
+        }
+        var candidates = all
             .Select(s => (Session: s, Category: CategoryFor(s.Type)))
             .Where(x => x.Category != null && IsLongEnough(x.Category, x.Session.Minutes))
             .OrderBy(x => x.Session.Start)
             .ToList();
-        if (candidates.Count == 0) return 0;
+        if (candidates.Count == 0) return result;
 
         var from = WorkoutPlan.WeekStart(DateOnly.FromDateTime(candidates[0].Session.Start));
         var to = DateOnly.FromDateTime(candidates[^1].Session.Start);
         var existing = await store.GetAllWorkoutsAsync(from, to);
         var swaps = await store.GetPlanSwapsAsync(from, to.AddDays(6));
-        var created = 0;
 
         foreach (var (session, watchCategory) in candidates)
         {
@@ -128,7 +140,13 @@ public static class WorkoutImporter
 
             if (match != null)
             {
-                if (match.Hidden) continue;
+                if (match.Hidden)
+                {
+                    result.Deleted.Add(session);
+                    continue;
+                }
+                if (linked) result.Linked.Add((session, match));
+                else result.AlreadyLogged.Add((session, match));
                 if (!Refresh(match, session) && !linked) continue;
                 await store.SaveWorkoutAsync(match);
                 continue;
@@ -147,9 +165,48 @@ public static class WorkoutImporter
             Refresh(workout, session);
             await store.SaveWorkoutAsync(workout);
             existing.Add(workout);
-            created++;
+            result.Created.Add((session, workout));
         }
-        return created;
+        return result;
+    }
+
+    /// <summary>
+    /// What to show after tapping Sync watch: what was added or linked, and when nothing
+    /// was, what Health Connect has for today, so a workout that hasn't reached Health
+    /// Connect yet can be told apart from one the app skipped.
+    /// </summary>
+    public static string SyncSummary(WorkoutImportResult result, IReadOnlyCollection<ExerciseSummary> sessions, DateTime now)
+    {
+        var today = DateOnly.FromDateTime(now);
+        bool IsToday(ExerciseSummary s) => DateOnly.FromDateTime(s.Start) == today;
+        static string Describe(ExerciseSummary s) => $"{s.Title ?? s.Type.Replace('_', ' ')} at {s.Start:h:mm tt}";
+        var parts = new List<string>();
+
+        foreach (var (session, workout) in result.Created)
+            parts.Add($"Added {workout.SessionType} from your watch ({Describe(session)}, {Math.Round(session.Minutes)} min).");
+        foreach (var (session, workout) in result.Linked)
+            parts.Add($"Linked your watch's {Describe(session)} to the {workout.SessionType} you logged.");
+        if (result.Created.Count + result.Linked.Count > 0)
+        {
+            if (result.Created.Concat(result.Linked).Any(x => WorkoutPlan.IsStrength(x.Workout.SessionType)))
+                parts.Add("Tap it to add sets and weights (optional).");
+            return string.Join(" ", parts);
+        }
+
+        foreach (var session in result.TooShort.Where(IsToday))
+            parts.Add($"Today's {Describe(session)} was only {Math.Round(session.Minutes)} min, under the minimum, so it wasn't added. Log it by hand if it counts.");
+        foreach (var session in result.Deleted.Where(IsToday))
+            parts.Add($"Today's {Describe(session)} was deleted here earlier, so it isn't added again.");
+        foreach (var (session, workout) in result.AlreadyLogged.Where(x => IsToday(x.Session)))
+            parts.Add($"Today's {Describe(session)} is already logged as {workout.SessionType}.");
+        if (parts.Count > 0) return string.Join(" ", parts);
+
+        var workoutsToday = sessions.Where(s => IsToday(s) && CategoryFor(s.Type) != null).ToList();
+        if (workoutsToday.Count > 0) return $"Up to date. Last checked {now:h:mm tt}.";
+
+        var latest = sessions.Where(s => CategoryFor(s.Type) != null).OrderByDescending(s => s.Start).FirstOrDefault();
+        var latestText = latest == null ? "" : $" The latest is {latest.Title ?? latest.Type.Replace('_', ' ')} on {latest.Start:ddd MMM d}.";
+        return $"Health Connect has no workout from today yet.{latestText} If your watch app shows one, it hasn't shared it with Health Connect yet; open that app to let it sync, then tap Sync watch again. Checked {now:h:mm tt}.";
     }
 
     /// <summary>
@@ -202,4 +259,14 @@ public static class WorkoutImporter
         }
         return changed;
     }
+}
+
+/// <summary>What one import did with the watch's sessions.</summary>
+public class WorkoutImportResult
+{
+    public List<(ExerciseSummary Session, WorkoutSession Workout)> Created { get; } = [];
+    public List<(ExerciseSummary Session, WorkoutSession Workout)> Linked { get; } = [];
+    public List<(ExerciseSummary Session, WorkoutSession Workout)> AlreadyLogged { get; } = [];
+    public List<ExerciseSummary> TooShort { get; } = [];
+    public List<ExerciseSummary> Deleted { get; } = [];
 }

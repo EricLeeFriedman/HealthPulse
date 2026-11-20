@@ -155,6 +155,64 @@ public sealed class WorkoutImporterTests : IAsyncLifetime
         Assert.Single(workout.Sets);
     }
 
+    static readonly DateTime Monday9am = new(2026, 11, 23, 9, 0, 0);
+
+    [Fact]
+    public async Task SyncSummary_NamesTheStrengthSessionAdded()
+    {
+        var weights = Session("hc-1", "strength_training", Monday9am, 42);
+        weights.Title = "Weights";
+        var result = await WorkoutImporter.ImportDetailedAsync(store, [weights]);
+
+        var (_, workout) = Assert.Single(result.Created);
+        Assert.Equal("Strength A", workout.SessionType);
+        var text = WorkoutImporter.SyncSummary(result, [weights], Monday9am.AddMinutes(50));
+        Assert.Contains("Added Strength A from your watch (Weights at 9:00", text);
+        Assert.Contains("add sets and weights", text);
+    }
+
+    [Fact]
+    public async Task SyncSummary_SaysWhenItLinkedToAWorkoutLoggedByHand()
+    {
+        await store.SaveWorkoutAsync(new WorkoutSession { Date = Monday9am, SessionType = "Strength A" });
+        var weights = Session("hc-1", "weightlifting", Monday9am.AddMinutes(2), 35);
+
+        var result = await WorkoutImporter.ImportDetailedAsync(store, [weights]);
+
+        Assert.Empty(result.Created);
+        Assert.Single(result.Linked);
+        Assert.Contains("to the Strength A you logged",
+            WorkoutImporter.SyncSummary(result, [weights], Monday9am.AddHours(1)));
+
+        var again = await WorkoutImporter.ImportDetailedAsync(store, [weights]);
+        Assert.Contains("already logged as Strength A",
+            WorkoutImporter.SyncSummary(again, [weights], Monday9am.AddHours(1)));
+    }
+
+    [Fact]
+    public async Task SyncSummary_ExplainsAShortSession()
+    {
+        var quick = Session("hc-1", "strength_training", Monday9am, 7);
+        var result = await WorkoutImporter.ImportDetailedAsync(store, [quick]);
+
+        Assert.Empty(result.Created);
+        Assert.Contains("only 7 min", WorkoutImporter.SyncSummary(result, [quick], Monday9am.AddHours(1)));
+    }
+
+    [Fact]
+    public async Task SyncSummary_SaysHealthConnectHasNothingToday()
+    {
+        var walk = Session("hc-1", "walking", Monday9am, 25);
+        var oldRun = Session("hc-2", "running", Monday9am.AddDays(-2), 20);
+        oldRun.Title = "Run";
+        await WorkoutImporter.ImportDetailedAsync(store, [oldRun]); // synced on Saturday
+        var result = await WorkoutImporter.ImportDetailedAsync(store, [walk, oldRun]);
+
+        var text = WorkoutImporter.SyncSummary(result, [walk, oldRun], Monday9am.AddHours(1));
+        Assert.Contains("Health Connect has no workout from today yet", text);
+        Assert.Contains("The latest is Run on Sat Nov 21", text);
+    }
+
     [Fact]
     public void HealthSummaryBuilder_KeepsTheRecordId()
     {
