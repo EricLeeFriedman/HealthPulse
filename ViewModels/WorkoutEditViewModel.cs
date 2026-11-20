@@ -9,20 +9,29 @@ namespace HealthPulse.ViewModels;
 
 public partial class SetLog : ObservableObject
 {
-    public SetLog(int number, bool weighted, bool timed, string amount = "", string weight = "")
+    public SetLog(int number, bool weighted, bool timed, string amount = "", string weight = "",
+        int? repsInReserve = null, string placeholder = "")
     {
         Number = number;
         Weighted = weighted;
         Timed = timed;
         Amount = amount;
         Weight = weight;
+        EffortIndex = repsInReserve is >= 0 ? Math.Min(repsInReserve.Value, 3) : -1;
+        AmountPlaceholder = string.IsNullOrEmpty(placeholder) ? (timed ? "seconds" : "reps") : placeholder;
     }
 
     public int Number { get; }
     public bool Weighted { get; }
     public bool Timed { get; }
     public string Label => $"Set {Number}";
-    public string AmountPlaceholder => Timed ? "seconds" : "reps";
+    public string AmountPlaceholder { get; }
+    public List<string> EffortOptions { get; } = [.. StrengthProgress.EffortOptions];
+
+    /// <summary>Reps in reserve picked for the set (0 to 3+), or -1 when not picked.</summary>
+    [ObservableProperty] public partial int EffortIndex { get; set; }
+
+    public int? RepsInReserve => EffortIndex >= 0 ? EffortIndex : null;
 
     [ObservableProperty] public partial string Amount { get; set; }
     [ObservableProperty] public partial string Weight { get; set; }
@@ -30,15 +39,33 @@ public partial class SetLog : ObservableObject
 
 public partial class ExerciseLog : ObservableObject
 {
-    public ExerciseLog(ExerciseTemplate template, string hint)
+    public ExerciseLog(ExerciseTemplate template, string hint, Recommendation? advice = null)
     {
         Template = template;
         Hint = hint;
+        Advice = advice;
     }
+
+    /// <summary>What to do this time, from the last sessions (double progression).</summary>
+    public Recommendation? Advice { get; }
+    public bool HasAdvice => Advice != null;
+    public string AdviceTag => Advice?.Tag ?? "";
+    public string AdviceText => Advice?.Reason ?? "";
+    public Color AdviceColor => Advice switch
+    {
+        { GoUp: true } => Color.FromArgb("#15803D"),
+        { BackOff: true } => Color.FromArgb("#B45309"),
+        _ => Color.FromArgb("#374151"),
+    };
+
+    /// <summary>"10-12" style placeholder for the reps box.</summary>
+    public string TargetPlaceholder => Advice == null ? "" :
+        (Advice.Target.Min == Advice.Target.Max ? $"{Advice.Target.Max}" : $"{Advice.Target.Min}-{Advice.Target.Max}")
+        + (Template.Timed ? " s" : " reps");
 
     public ExerciseTemplate Template { get; }
     public string Name => Template.Name;
-    public string Unit => Template.Unit + (Template.Weighted ? ", lb" : "");
+    public string Unit => Template.Unit + (Template.Weighted ? ", lb per dumbbell" : "");
     public string Hint { get; }
     public bool HasHint => !string.IsNullOrEmpty(Hint);
     public string HowTo => ExerciseGuide.For(Template.Name) is { } guide ? $"{guide.How} {guide.Load}" : "";
@@ -57,7 +84,7 @@ public partial class ExerciseLog : ObservableObject
     void AddSet()
     {
         var last = Sets.LastOrDefault();
-        Sets.Add(new SetLog(Sets.Count + 1, Template.Weighted, Template.Timed, last?.Amount ?? "", last?.Weight ?? ""));
+        Sets.Add(new SetLog(Sets.Count + 1, Template.Weighted, Template.Timed, "", last?.Weight ?? "", placeholder: TargetPlaceholder));
     }
 
     [RelayCommand]
@@ -99,6 +126,11 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
     [ObservableProperty] public partial string Notes { get; set; } = "";
     [ObservableProperty] public partial bool IsRun { get; set; }
     [ObservableProperty] public partial bool IsMobility { get; set; }
+    [ObservableProperty] public partial bool IsStrength { get; set; }
+
+    public string EffortHelp =>
+        "After each set, type the reps and pick how many more good reps you had left (0 = couldn't do another). " +
+        "Weights are pre-filled with today's recommendation. When every set reaches the top of the range with 2 or more left, the next session goes up.";
     [ObservableProperty] public partial string NewExercise { get; set; } = "";
     [ObservableProperty] public partial string DetectedText { get; set; } = "";
     [ObservableProperty] public partial bool IsDetected { get; set; }
@@ -244,6 +276,7 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
         var day = DateOnly.FromDateTime(Date);
         IsRun = type == WorkoutPlan.Run;
         IsMobility = type == WorkoutPlan.Mobility;
+        IsStrength = WorkoutPlan.IsStrength(type);
         TargetText = WorkoutPlan.TargetFor(type, day);
 
         var templates = WorkoutPlan.Exercises(type, day).ToList();
@@ -261,24 +294,29 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
         var list = new ObservableCollection<ExerciseLog>();
         foreach (var template in templates)
         {
-            var last = WorkoutPlan.LastSets(template.Name, history.Where(h => h.Id != session.Id));
+            // Only sessions before this one count, so editing an old workout shows the advice it had.
+            var earlier = history.Where(h => h.Id != session.Id && (!IsExisting || h.Date < session.Date)).ToList();
+            var last = WorkoutPlan.LastSets(template.Name, earlier);
             var hint = WorkoutPlan.LastTimeText(last);
-            if (WorkoutPlan.ShouldGoUp(last, day)) hint += ". You hit 12 on every set: go up one dumbbell size.";
-            var log = new ExerciseLog(template, hint);
+            var advice = StrengthProgress.Recommend(template, StrengthProgress.History(template.Name, earlier), day);
+            var log = new ExerciseLog(template, hint, advice);
             var mine = saved.Where(s => s.Exercise == template.Name).OrderBy(s => s.Order).ToList();
             if (mine.Count > 0)
             {
                 foreach (var set in mine)
                     log.Sets.Add(new SetLog(log.Sets.Count + 1, template.Weighted, template.Timed,
                         (template.Timed ? set.Seconds : set.Reps)?.ToString(CultureInfo.CurrentCulture) ?? "",
-                        set.WeightLbs?.ToString("0.#", CultureInfo.CurrentCulture) ?? ""));
+                        set.WeightLbs?.ToString("0.#", CultureInfo.CurrentCulture) ?? "",
+                        set.RepsInReserve, log.TargetPlaceholder));
             }
             else if (saved.Count == 0)
             {
-                // Prefill the weight from last time; reps are typed after each set.
-                var weight = last.FirstOrDefault()?.WeightLbs?.ToString("0.#", CultureInfo.CurrentCulture) ?? "";
+                // Prefill the recommended weight (last time's, or one step up or down);
+                // reps and reps left are typed after each set.
+                var lastWeight = last.Max(s => s.WeightLbs);
+                var weight = (advice.WeightLbs ?? lastWeight)?.ToString("0.#", CultureInfo.CurrentCulture) ?? "";
                 for (var i = 0; i < targetSets; i++)
-                    log.Sets.Add(new SetLog(i + 1, template.Weighted, template.Timed, "", weight));
+                    log.Sets.Add(new SetLog(i + 1, template.Weighted, template.Timed, "", weight, placeholder: log.TargetPlaceholder));
             }
             list.Add(log);
         }
@@ -306,7 +344,7 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
         session.Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim();
         session.Alternative = SelectedAlternative;
         session.Sets = WorkoutForm.BuildSets(Exercises.SelectMany(e =>
-            e.Sets.Select(s => new SetInput(e.Name, e.Template.Timed, s.Amount, s.Weight))));
+            e.Sets.Select(s => new SetInput(e.Name, e.Template.Timed, s.Amount, s.Weight, s.RepsInReserve))));
         await Store.SaveWorkoutAsync(session);
         _ = Exporter.ExportIfDueAsync();
         await Shell.Current.GoToAsync("..");

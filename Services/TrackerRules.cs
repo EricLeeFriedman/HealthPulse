@@ -73,6 +73,7 @@ public static class TrackerRules
             if (set.Reps is < 0 or > 1000) throw new ArgumentException($"{set.Exercise}: reps must be 0 to 1000.");
             if (set.WeightLbs is < 0 or > 500) throw new ArgumentException($"{set.Exercise}: weight must be 0 to 500 lb.");
             if (set.Seconds is < 0 or > 3600) throw new ArgumentException($"{set.Exercise}: time must be 0 to 3600 seconds.");
+            if (set.RepsInReserve is < 0 or > 3) throw new ArgumentException($"{set.Exercise}: reps left must be 0 to 3.");
         }
     }
 

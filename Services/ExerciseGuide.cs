@@ -105,7 +105,7 @@ public static class ExerciseGuide
             text.Append($"\n{number++}. {exercise.Name}: {Prescription(exercise, date)}\n");
             if (guide != null) text.Append($"How: {guide.How}\nWeight: {guide.Load}\n");
         }
-        text.Append("\nPick a weight where the last 2 reps are hard but your form stays clean. Log your sets on the Fitness tab; next time it shows what you lifted.");
+        text.Append("\nPick a weight where the last 2 reps are hard but your form stays clean. Log each set's weight, reps and how many reps you had left; the workout screen then pre-fills your weights and tells you when to go up.");
         return text.ToString();
     }
 

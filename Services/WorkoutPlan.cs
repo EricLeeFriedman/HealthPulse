@@ -263,9 +263,13 @@ public static class WorkoutPlan
     {
         if (sets.Count == 0) return "";
         var first = sets[0];
-        var amount = first.Seconds.HasValue ? $"{first.Seconds} s" : $"{first.Reps}";
+        var amounts = sets.Select(s => s.Seconds.HasValue ? $"{s.Seconds} s" : $"{s.Reps}").ToList();
+        // "3 x 10" when every set matched, otherwise each set: "3 x 10/10/8".
+        var amount = amounts.Distinct().Count() == 1 ? amounts[0] : string.Join("/", amounts);
         var weight = first.WeightLbs.HasValue ? $" @ {first.WeightLbs:0.#} lb" : "";
-        return $"Last time: {sets.Count} x {amount}{weight}";
+        var effort = sets.Where(s => s.RepsInReserve.HasValue).Select(s => s.RepsInReserve!.Value).ToList();
+        var left = effort.Count == 0 ? "" : $" ({StrengthProgress.EffortText(effort.Min())} left on the hardest set)";
+        return $"Last time: {sets.Count} x {amount}{weight}{left}";
     }
 
     /// <summary>

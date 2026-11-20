@@ -299,7 +299,7 @@ public class HealthExportService
             healthConnectSteps = healthSteps is { Count: > 0 } ? healthSteps : null,
             weatherError,
             appErrors = appErrors is { Count: > 0 } ? appErrors : null,
-            notes = "Times are local. sleepHours sums sleep sessions that ended on that date (the night before it). Heart rate values are beats per minute. Pressure is sea-level hPa from Open-Meteo for the phone's coarse location; pressureMaxDrop6hHpa is the biggest 6-hour fall ending that day. Progress photos stay on the phone and are only counted here. meals are free-text food entries with rough portions; proteinGrams on a meal is the user's own estimate. A meal can also have a portion picked from a fixed list (portionSize says what it means, e.g. Medium bowl is about 1.5 to 2 cups), ingredients ticked from chips (main ingredients, not a complete list), and a photo: photo is the path relative to this file's folder (My Drive/HealthPulse/meal-photos/...), and photoDriveFileId is its Google Drive file id. photoPendingUpload means a photo was taken but goes up with the next export. Use the photo, portion and ingredients together with the text to estimate nutrients.",
+            notes = "Times are local. sleepHours sums sleep sessions that ended on that date (the night before it). Heart rate values are beats per minute. Pressure is sea-level hPa from Open-Meteo for the phone's coarse location; pressureMaxDrop6hHpa is the biggest 6-hour fall ending that day. Progress photos stay on the phone and are only counted here. meals are free-text food entries with rough portions; proteinGrams on a meal is the user's own estimate. A meal can also have a portion picked from a fixed list (portionSize says what it means, e.g. Medium bowl is about 1.5 to 2 cups), ingredients ticked from chips (main ingredients, not a complete list), and a photo: photo is the path relative to this file's folder (My Drive/HealthPulse/meal-photos/...), and photoDriveFileId is its Google Drive file id. photoPendingUpload means a photo was taken but goes up with the next export. Use the photo, portion and ingredients together with the text to estimate nutrients. Workout sets have rir (reps in reserve, 0 to 3 where 3 means 3 or more) when rated; weights are per dumbbell. strength summarizes each exercise's progression (weight, estimated one-rep max, volume) and the app's next recommendation; strength.rule explains the rule.",
             plan = new
             {
                 start = WorkoutPlan.PlanStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
@@ -343,9 +343,20 @@ public class HealthExportService
                 distanceMiles = x.DistanceMiles,
                 notes = x.Notes,
                 sets = x.Sets.Count > 0
-                    ? x.Sets.Select(set => new { exercise = set.Exercise, reps = set.Reps, weightLbs = set.WeightLbs, seconds = set.Seconds })
+                    ? x.Sets.Select(set => new
+                    {
+                        exercise = set.Exercise,
+                        reps = set.Reps,
+                        weightLbs = set.WeightLbs,
+                        seconds = set.Seconds,
+                        rir = set.RepsInReserve,
+                    })
                     : null,
+                volumeLbs = x.Sets.Any(set => set.WeightLbs.HasValue && set.Reps.HasValue)
+                    ? x.Sets.Sum(set => (set.WeightLbs ?? 0) * (set.Reps ?? 0))
+                    : (double?)null,
             }),
+            strength = Strength(workouts, to),
             measurements = measurements.Select(m => new
             {
                 date = m.Date,
@@ -369,6 +380,56 @@ public class HealthExportService
 
     static string? Clock(TimeSpan? time) =>
         time.HasValue ? time.Value.ToString(@"hh\:mm", CultureInfo.InvariantCulture) : null;
+
+    /// <summary>Per-exercise progression and the next recommendation, for agents reading the export.</summary>
+    static object? Strength(List<WorkoutSession> workouts, DateOnly to)
+    {
+        var progress = StrengthProgress.Summaries(workouts, to);
+        if (progress.Count == 0) return null;
+        static string Day(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        return new
+        {
+            rule = StrengthProgress.RuleText,
+            exercises = progress.Select(p => new
+            {
+                exercise = p.Exercise.Name,
+                weighted = p.Exercise.Weighted,
+                timed = p.Exercise.Timed,
+                perSide = p.Exercise.PerSide,
+                lowerBody = StrengthProgress.IsLowerBody(p.Exercise.Name),
+                sessions = p.Sessions.Count,
+                firstDate = Day(p.First.Date),
+                lastDate = Day(p.Last.Date),
+                firstWeightLbs = p.First.WeightLbs,
+                currentWeightLbs = p.Last.WeightLbs,
+                weightChangeLbs = p.First.WeightLbs.HasValue && p.Last.WeightLbs.HasValue ? p.Last.WeightLbs - p.First.WeightLbs : null,
+                firstE1rmLbs = p.First.E1rmLbs,
+                lastE1rmLbs = p.Last.E1rmLbs,
+                bestE1rmLbs = p.Sessions.Max(s => s.E1rmLbs),
+                sessionsAtCurrentWeight = p.Last.WeightLbs.HasValue ? p.StalledSessions : (int?)null,
+                next = new
+                {
+                    date = Day(p.NextDate),
+                    action = p.Next.Action,
+                    weightLbs = p.Next.WeightLbs,
+                    targetMin = p.Next.Target.Min,
+                    targetMax = p.Next.Target.Max,
+                    targetUnit = p.Next.Target.Seconds ? "seconds" : "reps",
+                    reason = p.Next.Reason,
+                },
+                history = p.Sessions.Select(s => new
+                {
+                    date = Day(s.Date),
+                    weightLbs = s.WeightLbs,
+                    reps = s.Sets.Any(x => x.Reps.HasValue) ? s.Sets.Select(x => x.Reps) : null,
+                    seconds = s.Sets.Any(x => x.Seconds.HasValue) ? s.Sets.Select(x => x.Seconds) : null,
+                    rir = s.Sets.Any(x => x.RepsInReserve.HasValue) ? s.Sets.Select(x => x.RepsInReserve) : null,
+                    e1rmLbs = s.E1rmLbs,
+                    volumeLbs = s.VolumeLbs,
+                }),
+            }),
+        };
+    }
 
     static List<object> Weeks(DateOnly from, DateOnly to, List<WorkoutSession> workouts, List<DailyCheckIn> checkIns)
     {

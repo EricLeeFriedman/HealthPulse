@@ -69,6 +69,8 @@ public partial class FitnessViewModel : ObservableObject
     [ObservableProperty] public partial string TestText { get; set; } = "";
     [ObservableProperty] public partial string TestDueText { get; set; } = "";
     [ObservableProperty] public partial ObservableCollection<WorkoutSession> Workouts { get; set; } = [];
+    [ObservableProperty] public partial string LiftingText { get; set; } = "";
+    [ObservableProperty] public partial string LiftingSummary { get; set; } = "";
 
     public async Task LoadAsync()
     {
@@ -88,6 +90,18 @@ public partial class FitnessViewModel : ObservableObject
                 : $"Today: {planned}{(doneToday ? " ✓ logged" : "")} • block {WorkoutPlan.Block(today)}, week {WorkoutPlan.WeekInBlock(today)}";
             TargetText = planned == null ? "" : WorkoutPlan.TargetFor(planned, today);
             Workouts = new ObservableCollection<WorkoutSession>(workouts.OrderByDescending(w => w.Date));
+
+            var lifting = StrengthProgress.Summaries(await Store.GetWorkoutsAsync(today.AddDays(-120), today), today);
+            LiftingText = lifting.Count == 0
+                ? "Log weights, reps and reps left on a strength day and each exercise shows here with when to go up."
+                : string.Join("\n", lifting.Select(p => p.Text));
+            var ready = lifting.Count(p => p.Next.GoUp);
+            var stalled = lifting.Count(p => p.StalledSessions >= 3 && p.Next.Action == StrengthProgress.HoldAction);
+            LiftingSummary = lifting.Count == 0 ? "" : string.Join(" ", new[]
+            {
+                ready > 0 ? $"{ready} exercise{(ready == 1 ? " is" : "s are")} ready to go up next session." : "Nothing to increase yet; keep building reps.",
+                stalled > 0 ? $"{stalled} stuck at the same weight for 3+ sessions." : null,
+            }.Where(t => t != null));
 
             var measurements = await Store.GetMeasurementsAsync(today.AddDays(-400), today);
             var lastWaist = measurements.LastOrDefault(m => m.WaistInches.HasValue);

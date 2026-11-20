@@ -152,6 +152,13 @@ public class WorkoutSet
     public int? Reps { get; set; }
     public double? WeightLbs { get; set; }
     public int? Seconds { get; set; }
+
+    /// <summary>
+    /// Effort as reps in reserve: how many more good reps (or, for a timed hold, about how many
+    /// more 5-second chunks) were left at the end of the set. 0 = nothing left, 3 = 3 or more.
+    /// Null when not rated.
+    /// </summary>
+    public int? RepsInReserve { get; set; }
 }
 
 /// <summary>Waist, weight and optional progress photos (photos stay on the phone).</summary>
