@@ -20,13 +20,15 @@ HealthPulse ("the app") is a personal, open-source Android app for logging migra
 
 **Daily check-in, workouts and measurements you enter.** Caffeine, water, meal times, free-text food entries, alcohol, stress, supplements, protein estimates, mobility, workouts (sets, reps, weights), waist, weight and fitness test results. These are stored on your phone and included in your Drive export.
 
+**Meal photos.** If you attach a photo to a food log entry, it is kept in the app's private storage on your phone and copied to the folder `HealthPulse/meal-photos` in your own Google Drive with the next export, so that tools you choose to read the export can see what you ate. Deleting the entry removes the phone's copy; a copy already in Drive stays until you delete it there.
+
 **Progress photos.** If you add progress photos, they are copied into the app's private storage on your phone. They are never uploaded or included in the export; the export only says how many photos were taken on a date. Taking a photo in the app uses the camera permission.
 
 **Approximate location and weather.** With your permission, the app reads your approximate (city-level) location, rounded to about 1 km, to look up barometric pressure, temperature and humidity from [Open-Meteo](https://open-meteo.com), a free weather service. Only the rounded coordinates are sent to Open-Meteo; no account or identifier is sent. The rounded coordinates are kept on your phone so the nightly export can update the weather. The daily weather summaries are stored on your phone and included in your export.
 
 **Health Connect data (read only).** With your permission, the app reads these types from Android Health Connect: sleep sessions, steps, heart rate, resting heart rate, heart rate variability, exercise sessions, distance, and weight. If you grant background access, it also reads them for the nightly export. The app never writes to or deletes from Health Connect. You can change or revoke these permissions at any time in Health Connect settings.
 
-**Google account and Google Drive.** If you choose **Sign in with Google**, the app requests only the `drive.file` permission. That lets it create and update files that it made itself, and it cannot see any other files in your Drive. It uses this to create the folder `HealthPulse` in My Drive and write `healthpulse-export.json`, which contains your migraine log, daily health summaries for the last 90 days, and recent app error messages (for troubleshooting). It also reads your Google account email address only to show which account is connected.
+**Google account and Google Drive.** If you choose **Sign in with Google**, the app requests only the `drive.file` permission. That lets it create and update files that it made itself, and it cannot see any other files in your Drive. It uses this to create the folder `HealthPulse` in My Drive, write `healthpulse-export.json` and copy any meal photos into `HealthPulse/meal-photos`. The export contains your migraine log, daily health summaries for the last 90 days, and recent app error messages (for troubleshooting). It also reads your Google account email address only to show which account is connected.
 
 ## How data is used
 

@@ -8,6 +8,13 @@ public interface IExportDestination
     Task<bool> ChooseDestinationAsync(string suggestedFileName);
     Task WriteAsync(string content);
     void Disconnect();
+
+    /// <summary>Whether meal photos can be copied next to the export.</summary>
+    bool CanUploadPhotos => false;
+
+    /// <summary>Copies a meal photo into the export's photo folder (once per name). Returns its file id.</summary>
+    Task<string> UploadPhotoAsync(string name, byte[] content, string mimeType) =>
+        throw new NotSupportedException("This export destination can't store photos.");
 }
 
 public class UnsupportedExportDestination : IExportDestination
