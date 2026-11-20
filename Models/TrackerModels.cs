@@ -38,6 +38,9 @@ public class DailyCheckIn
     /// <summary>The mobility routine (planned for Sunday) was done today.</summary>
     public bool MobilityDone { get; set; }
 
+    /// <summary>Jublia was applied today. A standalone daily item, not one of the migraine supplements.</summary>
+    public bool Jublia { get; set; }
+
     public string? Notes { get; set; }
     /// <summary>UTC time of the last save; DateTime.MinValue for a day with no check-in yet.</summary>
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

@@ -257,6 +257,7 @@ public class HealthExportService
                     proteinGrams = c.ProteinGrams,
                     proteinStatus = c.ProteinGrams.HasValue ? TrackerRules.Protein(c.ProteinGrams).ToString() : null,
                     mobilityDone = c.MobilityDone,
+                    jubliaApplied = c.Jublia,
                     notes = c.Notes,
                 },
                 meals = dayFood.Count > 0

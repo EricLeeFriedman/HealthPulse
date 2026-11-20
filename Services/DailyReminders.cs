@@ -8,7 +8,7 @@ public record ReminderTask(string Key, string Text);
 
 /// <summary>
 /// Reminders at 9 AM, noon, 3, 6 and 9 PM listing what's still open today:
-/// preventives, the planned workout, the check-in and the weekly
+/// preventives, Jublia, the planned workout, the check-in and the weekly
 /// waist/weight. They stop for the day once everything is done, or when the
 /// user taps "Stop for today".
 /// </summary>
@@ -60,6 +60,9 @@ public static class DailyReminders
             if (checkIn?.Magnesium != true) missing.Add("magnesium");
             tasks.Add(new("preventives", $"Take preventives ({string.Join(", ", missing)})"));
         }
+
+        if (checkIn?.Jublia != true)
+            tasks.Add(new("jublia", "Apply Jublia"));
 
         var planned = WorkoutPlan.PlannedFor(date, swaps);
         if (planned != null && !WorkoutDone(planned, date, checkIn, workouts))

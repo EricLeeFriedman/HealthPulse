@@ -15,7 +15,7 @@ public class TrackerExportTests
             {
                 Date = "2026-11-23", CaffeineCups = 3, LastCaffeineTime = new TimeSpan(12, 5, 0), WaterGlasses = 7,
                 FirstMealTime = new TimeSpan(9, 30, 0), AlcoholDrinks = 0, Stress = 2,
-                Riboflavin = true, BComplex = true, CoQ10 = true, Magnesium = false, ProteinGrams = 105
+                Riboflavin = true, BComplex = true, CoQ10 = true, Magnesium = false, Jublia = true, ProteinGrams = 105
             }],
             [new WorkoutSession
             {
@@ -54,6 +54,8 @@ public class TrackerExportTests
         Assert.Equal(7, checkIn.GetProperty("waterGlasses").GetInt32());
         Assert.False(checkIn.GetProperty("allSupplements").GetBoolean());
         Assert.False(checkIn.GetProperty("supplements").GetProperty("magnesium").GetBoolean());
+        Assert.True(checkIn.GetProperty("jubliaApplied").GetBoolean());
+        Assert.False(checkIn.GetProperty("supplements").TryGetProperty("jublia", out _)); // not a migraine supplement
         Assert.Equal("Below", checkIn.GetProperty("proteinStatus").GetString());
         var weather = monday.GetProperty("weather");
         Assert.Equal(-5.5, weather.GetProperty("pressureChangeHpa").GetDouble());
