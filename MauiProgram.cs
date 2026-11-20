@@ -60,6 +60,7 @@ public static class MauiProgram
                 RecentErrors = () => errors.Recent(DateTime.Now),
                 ExportFailed = exception => errors.Record("Export", exception),
                 Trackers = services.GetRequiredService<ITrackerStore>(),
+                ReadPhoto = async path => File.Exists(path) ? await File.ReadAllBytesAsync(path) : null,
                 RefreshWeather = (today, days) =>
                     services.GetRequiredService<WeatherService>().RefreshAsync(today, days, interactive: false)
             };

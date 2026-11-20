@@ -12,6 +12,12 @@ public class FrequentFood
     /// <summary>Protein from the most recent entry that had an estimate, if any.</summary>
     public int? ProteinGrams { get; init; }
 
+    /// <summary>Portion from the most recent entry, if it had one.</summary>
+    public string? Portion { get; init; }
+
+    /// <summary>Ingredients from the most recent entry that had any.</summary>
+    public IReadOnlyList<string> Ingredients { get; init; } = [];
+
     /// <summary>Times logged in the look-back window.</summary>
     public int Count { get; init; }
 
@@ -45,6 +51,8 @@ public static partial class FrequentFoods
                 {
                     Text = latest.Text.Trim(),
                     ProteinGrams = g.Where(e => e.ProteinGrams.HasValue).MaxBy(e => e.Time)?.ProteinGrams,
+                    Portion = FoodLog.FindPortion(latest.Portion)?.Name,
+                    Ingredients = g.Where(e => e.IngredientList.Count > 0).MaxBy(e => e.Time)?.IngredientList ?? [],
                     Count = g.Count(),
                     LastEaten = latest.Time,
                 };

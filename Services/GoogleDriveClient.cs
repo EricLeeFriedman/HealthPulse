@@ -71,16 +71,36 @@ public class GoogleDriveClient
         return files.GetArrayLength() > 0 ? files[0].GetProperty("id").GetString() : null;
     }
 
-    public async Task<string> CreateFolderAsync(string token, string name)
+    public async Task<string> CreateFolderAsync(string token, string name, string? parentId = null)
     {
-        var body = JsonSerializer.Serialize(new { name, mimeType = FolderMimeType, parents = new[] { "root" } });
+        var body = JsonSerializer.Serialize(new { name, mimeType = FolderMimeType, parents = new[] { parentId ?? "root" } });
         using var doc = await SendJsonAsync(HttpMethod.Post, $"{Api}/files?fields=id", token,
             () => new StringContent(body, Encoding.UTF8, "application/json"));
         return doc.RootElement.GetProperty("id").GetString()!;
     }
 
-    public async Task<string> EnsureFolderAsync(string token, string name) =>
-        await FindAsync(token, name, null, FolderMimeType) ?? await CreateFolderAsync(token, name);
+    /// <summary>Finds or creates a folder in My Drive, or inside <paramref name="parentId"/> when given.</summary>
+    public async Task<string> EnsureFolderAsync(string token, string name, string? parentId = null) =>
+        await FindAsync(token, name, parentId, FolderMimeType) ?? await CreateFolderAsync(token, name, parentId);
+
+    /// <summary>Creates a binary file (a photo, say) in a folder. Returns its id.</summary>
+    public async Task<string> CreateBinaryFileAsync(string token, string folderId, string name, byte[] content, string mimeType)
+    {
+        var boundary = "healthpulse" + Guid.NewGuid().ToString("N");
+        var metadata = JsonSerializer.Serialize(new { name, parents = new[] { folderId }, mimeType });
+        using var doc = await SendJsonAsync(HttpMethod.Post, $"{UploadApi}/files?uploadType=multipart&fields=id", token,
+            () =>
+            {
+                var file = new ByteArrayContent(content);
+                file.Headers.ContentType = new MediaTypeHeaderValue(mimeType);
+                return new MultipartContent("related", boundary)
+                {
+                    new StringContent(metadata, Encoding.UTF8, "application/json"),
+                    file
+                };
+            });
+        return doc.RootElement.GetProperty("id").GetString()!;
+    }
 
     public async Task<string> CreateFileAsync(string token, string folderId, string name, string content, string mimeType)
     {

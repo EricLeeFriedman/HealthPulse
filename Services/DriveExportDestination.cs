@@ -13,6 +13,7 @@ public class DriveExportDestination : IExportDestination
     public const string AccountKey = "drive_account";
     public const string FolderIdKey = "drive_folder_id";
     public const string FileIdKey = "drive_file_id";
+    public const string PhotoFolderIdKey = "drive_photo_folder_id";
     public static string DrivePath => $"My Drive/{FolderName}/{HealthExportService.FileName}";
 
     readonly IGoogleAuth auth;
@@ -52,6 +53,52 @@ public class DriveExportDestination : IExportDestination
         settings.SetString(AccountKey, null);
         settings.SetString(FolderIdKey, null);
         settings.SetString(FileIdKey, null);
+        settings.SetString(PhotoFolderIdKey, null);
+    }
+
+    public bool CanUploadPhotos => true;
+
+    /// <summary>
+    /// Copies a meal photo to My Drive/HealthPulse/meal-photos. A photo already there under the
+    /// same name (an upload whose answer was lost) is reused instead of copied again.
+    /// </summary>
+    public async Task<string> UploadPhotoAsync(string name, byte[] content, string mimeType)
+    {
+        if (!HasDestination)
+            throw new InvalidOperationException("Sign in with Google first.");
+        var token = await auth.GetAccessTokenAsync(interactive: false);
+        try
+        {
+            return await UploadPhotoWithTokenAsync(token, name, content, mimeType);
+        }
+        catch (GoogleDriveClient.DriveUnauthorizedException)
+        {
+            await auth.InvalidateAsync(token);
+            return await UploadPhotoWithTokenAsync(await auth.GetAccessTokenAsync(interactive: false), name, content, mimeType);
+        }
+    }
+
+    async Task<string> UploadPhotoWithTokenAsync(string token, string name, byte[] content, string mimeType)
+    {
+        var photoFolderId = settings.GetString(PhotoFolderIdKey);
+        if (photoFolderId != null)
+        {
+            try
+            {
+                return await drive.FindAsync(token, name, photoFolderId, null)
+                       ?? await drive.CreateBinaryFileAsync(token, photoFolderId, name, content, mimeType);
+            }
+            catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // The folder was deleted: find or recreate it below.
+            }
+        }
+        var folderId = await drive.EnsureFolderAsync(token, FolderName);
+        settings.SetString(FolderIdKey, folderId);
+        photoFolderId = await drive.EnsureFolderAsync(token, FoodLog.PhotoFolderName, folderId);
+        settings.SetString(PhotoFolderIdKey, photoFolderId);
+        return await drive.FindAsync(token, name, photoFolderId, null)
+               ?? await drive.CreateBinaryFileAsync(token, photoFolderId, name, content, mimeType);
     }
 
     public async Task WriteAsync(string content)

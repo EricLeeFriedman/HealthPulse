@@ -37,6 +37,10 @@ public class HealthExportService
     public TimeSpan WeatherTimeout { get; set; } = TimeSpan.FromSeconds(45);
     public TimeSpan TrackerTimeout { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan UploadTimeout { get; set; } = TimeSpan.FromSeconds(90);
+    public TimeSpan PhotoTimeout { get; set; } = TimeSpan.FromSeconds(120);
+
+    /// <summary>Reads a local meal photo for upload (null when the file is gone). Photos aren't uploaded without it.</summary>
+    public Func<string, Task<byte[]?>>? ReadPhoto { get; set; }
     /// <summary>How long Export now waits for an export that's already running.</summary>
     public TimeSpan LockTimeout { get; set; } = TimeSpan.FromMinutes(5);
 
@@ -260,7 +264,13 @@ public class HealthExportService
                     {
                         time = f.Time.ToString("HH:mm", CultureInfo.InvariantCulture),
                         text = f.Text,
+                        portion = FoodLog.FindPortion(f.Portion)?.Name,
+                        portionSize = FoodLog.FindPortion(f.Portion)?.Size,
+                        ingredients = f.IngredientList.Count > 0 ? f.IngredientList : null,
                         proteinGrams = f.ProteinGrams,
+                        photo = f.HasPhoto && !string.IsNullOrEmpty(f.PhotoDriveId) ? MealPhotos.ExportPath(f) : null,
+                        photoDriveFileId = f.HasPhoto ? f.PhotoDriveId : null,
+                        photoPendingUpload = f.HasPhoto && string.IsNullOrEmpty(f.PhotoDriveId) ? true : (bool?)null,
                     })
                     : null,
                 mealProteinGrams = FoodLog.ProteinTotal(dayFood),
@@ -289,7 +299,7 @@ public class HealthExportService
             healthConnectSteps = healthSteps is { Count: > 0 } ? healthSteps : null,
             weatherError,
             appErrors = appErrors is { Count: > 0 } ? appErrors : null,
-            notes = "Times are local. sleepHours sums sleep sessions that ended on that date (the night before it). Heart rate values are beats per minute. Pressure is sea-level hPa from Open-Meteo for the phone's coarse location; pressureMaxDrop6hHpa is the biggest 6-hour fall ending that day. Progress photos stay on the phone and are only counted here. meals are free-text food entries with rough portions; proteinGrams on a meal is the user's own estimate.",
+            notes = "Times are local. sleepHours sums sleep sessions that ended on that date (the night before it). Heart rate values are beats per minute. Pressure is sea-level hPa from Open-Meteo for the phone's coarse location; pressureMaxDrop6hHpa is the biggest 6-hour fall ending that day. Progress photos stay on the phone and are only counted here. meals are free-text food entries with rough portions; proteinGrams on a meal is the user's own estimate. A meal can also have a portion picked from a fixed list (portionSize says what it means, e.g. Medium bowl is about 1.5 to 2 cups), ingredients ticked from chips (main ingredients, not a complete list), and a photo: photo is the path relative to this file's folder (My Drive/HealthPulse/meal-photos/...), and photoDriveFileId is its Google Drive file id. photoPendingUpload means a photo was taken but goes up with the next export. Use the photo, portion and ingredients together with the text to estimate nutrients.",
             plan = new
             {
                 start = WorkoutPlan.PlanStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
@@ -403,7 +413,9 @@ public class HealthExportService
         }
         try
         {
+            var photoWarning = await UploadMealPhotosAsync(DateOnly.FromDateTime(DateTime.Today));
             var json = await BuildJsonAsync(DateOnly.FromDateTime(DateTime.Today));
+            if (photoWarning != null) LastWarnings.Add(photoWarning);
             Status("Uploading to Google Drive…");
             await Timeouts.Limit(Destination.WriteAsync(json), UploadTimeout, "Uploading to Google Drive");
             Settings.SetString(LastExportKey, DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
@@ -425,6 +437,30 @@ public class HealthExportService
         {
             Status("");
             ExportLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Copies new meal photos to Drive before the export is built, so the export can point to them.
+    /// A failure only delays the photos to the next export. Returns a warning or null.
+    /// </summary>
+    async Task<string?> UploadMealPhotosAsync(DateOnly today)
+    {
+        if (Trackers == null || ReadPhoto == null || !Destination.CanUploadPhotos) return null;
+        try
+        {
+            Status("Uploading meal photos…");
+            var from = today.AddDays(-(DefaultDays - 1));
+            var warning = await Timeouts.Limit(
+                MealPhotos.UploadPendingAsync(Trackers, Destination, ReadPhoto, from, today),
+                PhotoTimeout, "Uploading meal photos");
+            if (warning != null) Logger.LogWarning("Meal photo upload: {Warning}", warning);
+            return warning;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Meal photo upload failed");
+            return $"Meal photos: {exception.Message}";
         }
     }
 

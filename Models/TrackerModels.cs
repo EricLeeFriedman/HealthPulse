@@ -236,11 +236,50 @@ public class FoodEntry
     /// <summary>Optional protein estimate in grams.</summary>
     public int? ProteinGrams { get; set; }
 
+    /// <summary>Optional rough portion, one of <c>FoodLog.Portions</c> (e.g. "Medium bowl").</summary>
+    public string? Portion { get; set; }
+
+    /// <summary>Optional main ingredients, separated by "|" (e.g. "Beans|Cheese|Pasta").</summary>
+    public string Ingredients { get; set; } = "";
+
+    [Ignore]
+    public IReadOnlyList<string> IngredientList
+    {
+        get => Ingredients.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        set => Ingredients = string.Join("|", value
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Local path of the optional meal photo, in the app's private storage.</summary>
+    public string? PhotoPath { get; set; }
+
+    /// <summary>File name of the photo in My Drive/HealthPulse/meal-photos, set when the photo is attached.</summary>
+    public string? PhotoName { get; set; }
+
+    /// <summary>Drive file id once the photo has been uploaded; null while it waits for the next export.</summary>
+    public string? PhotoDriveId { get; set; }
+
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    [Ignore]
+    public bool HasPhoto => !string.IsNullOrEmpty(PhotoPath);
 
     [Ignore]
     public string DisplayTime => Time.ToString("h:mm tt");
 
     [Ignore]
-    public string Display => ProteinGrams.HasValue ? $"{Text}  •  {ProteinGrams} g protein" : Text;
+    public string Display
+    {
+        get
+        {
+            var parts = new List<string> { Text };
+            if (!string.IsNullOrWhiteSpace(Portion)) parts.Add(Portion!);
+            if (IngredientList.Count > 0) parts.Add(string.Join(", ", IngredientList));
+            if (ProteinGrams.HasValue) parts.Add($"{ProteinGrams} g protein");
+            if (HasPhoto) parts.Add("📷");
+            return string.Join("  •  ", parts);
+        }
+    }
 }

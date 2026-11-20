@@ -30,6 +30,23 @@ public partial class AlternativeItem : ObservableObject
     void ToggleHow() => ShowHow = !ShowHow;
 }
 
+/// <summary>An ingredient chip in the food log; tap to tick or untick it.</summary>
+public partial class IngredientChip : ObservableObject
+{
+    public IngredientChip(string name, bool isSelected = false)
+    {
+        Name = name;
+        IsSelected = isSelected;
+    }
+
+    public string Name { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Text))]
+    public partial bool IsSelected { get; set; }
+    public string Text => IsSelected ? $"✓ {Name}" : Name;
+}
+
 public partial class TodayViewModel : ObservableObject
 {
     public ITrackerStore Store;
@@ -309,10 +326,128 @@ public partial class TodayViewModel : ObservableObject
     [RelayCommand]
     void CancelFoodEdit()
     {
+        DiscardUnsavedPhoto();
         EditingFood = null;
         NewFoodText = "";
         NewFoodTime = ClockNow.Time(DateTime.Now);
         pickedFood = null;
+        ResetFoodDetails();
+    }
+
+    /// <summary>Portion picker options, each with the size it stands for.</summary>
+    public List<string> PortionChoices { get; } = [.. FoodLog.PortionChoices];
+
+    [ObservableProperty] public partial string NewFoodPortion { get; set; } = FoodLog.NoPortion;
+
+    /// <summary>Common ingredients plus ones typed in recently; ticked ones are saved with the entry.</summary>
+    [ObservableProperty] public partial ObservableCollection<IngredientChip> IngredientChips { get; set; } = [];
+    [ObservableProperty] public partial string CustomIngredient { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNewFoodPhoto), nameof(NewFoodPhoto))]
+    public partial string? NewFoodPhotoPath { get; set; }
+    public bool HasNewFoodPhoto => !string.IsNullOrEmpty(NewFoodPhotoPath);
+    public ImageSource? NewFoodPhoto => HasNewFoodPhoto ? ImageSource.FromFile(NewFoodPhotoPath) : null;
+
+    List<string> SelectedIngredients => IngredientChips.Where(c => c.IsSelected).Select(c => c.Name).ToList();
+
+    void SetIngredients(IEnumerable<string> names)
+    {
+        var wanted = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+        foreach (var chip in IngredientChips) chip.IsSelected = wanted.Remove(chip.Name);
+        // Ingredients not among the chips (older custom ones) get a chip of their own.
+        foreach (var name in wanted) IngredientChips.Add(new IngredientChip(name, true));
+    }
+
+    void ResetFoodDetails()
+    {
+        NewFoodPortion = FoodLog.NoPortion;
+        CustomIngredient = "";
+        NewFoodPhotoPath = null;
+        SetIngredients([]);
+    }
+
+    [RelayCommand]
+    void ToggleIngredient(IngredientChip? chip)
+    {
+        if (chip != null) chip.IsSelected = !chip.IsSelected;
+    }
+
+    [RelayCommand]
+    void AddCustomIngredient()
+    {
+        var name = CustomIngredient.Trim();
+        if (name.Length == 0) return;
+        if (name.Length > FoodLog.MaxIngredientLength) name = name[..FoodLog.MaxIngredientLength];
+        var chip = IngredientChips.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (chip == null) IngredientChips.Add(new IngredientChip(name, true));
+        else chip.IsSelected = true;
+        CustomIngredient = "";
+    }
+
+    public static string MealPhotoFolder => Path.Combine(FileSystem.AppDataDirectory, FoodLog.PhotoFolderName);
+
+    static MediaPickerOptions MealPhotoOptions => new()
+    {
+        Title = "Meal photo",
+        // Small enough to upload quickly, still clear enough to see what's in the bowl.
+        MaximumWidth = 1600,
+        MaximumHeight = 1600,
+        CompressionQuality = 80,
+        RotateImage = true,
+    };
+
+    [RelayCommand]
+    Task TakeFoodPhotoAsync() => UiActions.RunAsync(Errors, "Taking meal photo", async () =>
+    {
+        if (!MediaPicker.Default.IsCaptureSupported) throw new InvalidOperationException("This phone can't take photos from the app.");
+        var photo = await MediaPicker.Default.CapturePhotoAsync(MealPhotoOptions);
+        if (photo != null) await KeepFoodPhotoAsync(photo);
+    });
+
+    [RelayCommand]
+    Task ChooseFoodPhotoAsync() => UiActions.RunAsync(Errors, "Choosing meal photo", async () =>
+    {
+        var options = MealPhotoOptions;
+        options.SelectionLimit = 1;
+        var photos = await MediaPicker.Default.PickPhotosAsync(options);
+        var photo = photos?.FirstOrDefault();
+        if (photo != null) await KeepFoodPhotoAsync(photo);
+    });
+
+    [RelayCommand]
+    void RemoveFoodPhoto()
+    {
+        DiscardUnsavedPhoto();
+        NewFoodPhotoPath = null;
+    }
+
+    /// <summary>Copies the photo into the app's private storage; it goes to Drive with the next export.</summary>
+    async Task KeepFoodPhotoAsync(FileResult photo)
+    {
+        Directory.CreateDirectory(MealPhotoFolder);
+        var extension = Path.GetExtension(photo.FileName);
+        if (string.IsNullOrEmpty(extension)) extension = ".jpg";
+        var path = Path.Combine(MealPhotoFolder, $"{Guid.NewGuid():N}{extension.ToLowerInvariant()}");
+        await using (var source = await photo.OpenReadAsync())
+        await using (var target = File.Create(path))
+            await source.CopyToAsync(target);
+        DiscardUnsavedPhoto();
+        NewFoodPhotoPath = path;
+    }
+
+    /// <summary>Deletes a photo taken for the form that no saved entry uses.</summary>
+    void DiscardUnsavedPhoto()
+    {
+        var path = NewFoodPhotoPath;
+        if (string.IsNullOrEmpty(path) || path == EditingFood?.PhotoPath) return;
+        TryDelete(path);
+    }
+
+    static void TryDelete(string? path)
+    {
+        try { if (!string.IsNullOrEmpty(path) && File.Exists(path)) File.Delete(path); }
+        catch { /* a leftover photo file is harmless */ }
     }
 
     /// <summary>Foods logged most often recently, most frequent first. Rebuilt after every add, edit or delete.</summary>
@@ -329,10 +464,16 @@ public partial class TodayViewModel : ObservableObject
     void PickFrequentFood(FrequentFood? food)
     {
         if (food == null) return;
+        DiscardUnsavedPhoto();
         EditingFood = null;
         NewFoodText = food.Text;
         NewFoodTime = ClockNow.Time(DateTime.Now);
         pickedFood = food;
+        // Same food, same usual portion and ingredients; a photo is of this meal only, so it starts empty.
+        NewFoodPhotoPath = null;
+        CustomIngredient = "";
+        NewFoodPortion = FoodLog.ChoiceFor(food.Portion);
+        SetIngredients(food.Ingredients);
     }
 
     async Task LoadFrequentFoodsAsync()
@@ -340,6 +481,10 @@ public partial class TodayViewModel : ObservableObject
         var (from, to) = FrequentFoods.Window(DateTime.Now);
         var entries = await Store.GetFoodAsync(from, to);
         FrequentFoodsList = new ObservableCollection<FrequentFood>(FrequentFoods.Build(entries));
+        var selected = SelectedIngredients;
+        IngredientChips = new ObservableCollection<IngredientChip>(
+            FoodLog.IngredientChoices(entries).Select(name => new IngredientChip(name)));
+        SetIngredients(selected);
     }
 
     [ObservableProperty] public partial bool MobilityDone { get; set; }
@@ -523,18 +668,31 @@ public partial class TodayViewModel : ObservableObject
     Task AddFoodAsync() => UiActions.RunAsync(Errors, "Saving food", async () =>
     {
         var entry = EditingFood ?? new FoodEntry();
+        var oldPhoto = entry.PhotoPath;
         entry.Time = Date.Date + NewFoodTime;
         entry.Text = NewFoodText;
+        entry.Portion = FoodLog.PortionFromChoice(NewFoodPortion);
+        entry.IngredientList = SelectedIngredients;
         if (EditingFood == null && pickedFood?.ProteinGrams is { } protein
             && FrequentFoods.Key(NewFoodText) == FrequentFoods.Key(pickedFood.Text))
             entry.ProteinGrams = protein;
+        if (NewFoodPhotoPath != oldPhoto)
+        {
+            entry.PhotoPath = NewFoodPhotoPath;
+            entry.PhotoName = NewFoodPhotoPath == null ? null : FoodLog.PhotoName(entry, Path.GetExtension(NewFoodPhotoPath));
+            entry.PhotoDriveId = null;
+        }
         await Store.SaveFoodAsync(entry);
+        if (oldPhoto != entry.PhotoPath) TryDelete(oldPhoto);
         EditingFood = null;
         NewFoodText = "";
         pickedFood = null;
+        ResetFoodDetails();
         await LoadMealsAsync(DateOnly.FromDateTime(Date));
         await LoadFrequentFoodsAsync();
         await ApplyMealsAsync();
+        // Send a new photo to Drive now rather than at the next scheduled export.
+        if (entry.HasPhoto && string.IsNullOrEmpty(entry.PhotoDriveId)) _ = Exporter.ExportIfDueAsync(force: true);
     });
 
     /// <summary>Tap an entry to edit or delete it.</summary>
@@ -545,15 +703,22 @@ public partial class TodayViewModel : ObservableObject
         var choice = await Shell.Current.DisplayActionSheetAsync(entry.Text, "Cancel", "Delete", "Edit");
         if (choice == "Edit")
         {
+            DiscardUnsavedPhoto();
             EditingFood = entry;
             pickedFood = null;
             NewFoodText = entry.Text;
             NewFoodTime = entry.Time.TimeOfDay;
+            NewFoodPortion = FoodLog.ChoiceFor(entry.Portion);
+            CustomIngredient = "";
+            NewFoodPhotoPath = entry.PhotoPath;
+            SetIngredients(entry.IngredientList);
         }
         else if (choice == "Delete")
         {
             await Store.DeleteFoodAsync(entry.Id);
             if (EditingFood?.Id == entry.Id) CancelFoodEdit();
+            // The phone's copy goes; a copy already uploaded stays in Drive's meal-photos folder.
+            TryDelete(entry.PhotoPath);
             await LoadMealsAsync(DateOnly.FromDateTime(Date));
             await LoadFrequentFoodsAsync();
             await ApplyMealsAsync();
