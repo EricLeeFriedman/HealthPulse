@@ -32,6 +32,7 @@
                         <Entry Grid.Column="1" Text="{Binding Distance}" Keyboard="Numeric" Placeholder="Miles" IsVisible="{Binding IsRun}" />
                     </Grid>
                     <Label Text="{Binding MobilityText}" FontSize="14" TextColor="#374151" IsVisible="{Binding IsMobility}" />
+                    <Label Text="{Binding EffortHelp}" Style="{StaticResource Muted}" IsVisible="{Binding IsStrength}" />
                 </VerticalStackLayout>
             </Border>
 
@@ -48,13 +49,19 @@
                                 <Label Text="{Binding HowTo}" FontSize="14" TextColor="#374151" IsVisible="{Binding ShowHowTo}" />
                                 <Label Text="{Binding Unit}" Style="{StaticResource Muted}" />
                                 <Label Text="{Binding Hint}" Style="{StaticResource Muted}" IsVisible="{Binding HasHint}" />
+                                <VerticalStackLayout Spacing="2" IsVisible="{Binding HasAdvice}">
+                                    <Label Text="{Binding AdviceTag}" FontSize="15" FontAttributes="Bold" TextColor="{Binding AdviceColor}" />
+                                    <Label Text="{Binding AdviceText}" FontSize="13" TextColor="#374151" />
+                                </VerticalStackLayout>
                                 <VerticalStackLayout Spacing="4" BindableLayout.ItemsSource="{Binding Sets}">
                                     <BindableLayout.ItemTemplate>
                                         <DataTemplate x:DataType="vm:SetLog">
-                                            <Grid ColumnDefinitions="60,*,*" ColumnSpacing="8">
+                                            <Grid ColumnDefinitions="48,*,*,92" ColumnSpacing="6">
                                                 <Label Text="{Binding Label}" VerticalOptions="Center" />
-                                                <Entry Grid.Column="1" Text="{Binding Amount}" Keyboard="Numeric" Placeholder="{Binding AmountPlaceholder}" />
-                                                <Entry Grid.Column="2" Text="{Binding Weight}" Keyboard="Numeric" Placeholder="lb" IsVisible="{Binding Weighted}" />
+                                                <Entry Grid.Column="1" Text="{Binding Weight}" Keyboard="Numeric" Placeholder="lb" IsVisible="{Binding Weighted}" />
+                                                <Entry Grid.Column="2" Text="{Binding Amount}" Keyboard="Numeric" Placeholder="{Binding AmountPlaceholder}" />
+                                                <Picker Grid.Column="3" ItemsSource="{Binding EffortOptions}" SelectedIndex="{Binding EffortIndex}"
+                                                        Title="Left?" FontSize="14" />
                                             </Grid>
                                         </DataTemplate>
                                     </BindableLayout.ItemTemplate>
