@@ -488,6 +488,7 @@ public partial class TodayViewModel : ObservableObject
     }
 
     [ObservableProperty] public partial bool MobilityDone { get; set; }
+    [ObservableProperty] public partial bool Jublia { get; set; }
     [ObservableProperty] public partial string MobilityLabel { get; set; } = "Mobility routine done";
     [ObservableProperty] public partial string Notes { get; set; } = "";
 
@@ -523,6 +524,7 @@ public partial class TodayViewModel : ObservableObject
             Magnesium = c.Magnesium;
             ProteinGrams = c.ProteinGrams?.ToString(CultureInfo.CurrentCulture) ?? "";
             MobilityDone = c.MobilityDone;
+            Jublia = c.Jublia;
             Notes = c.Notes ?? "";
             SavedText = c.UpdatedAt == DateTime.MinValue
                 ? "Not checked in yet"
@@ -642,6 +644,7 @@ public partial class TodayViewModel : ObservableObject
         Magnesium = Magnesium,
         ProteinGrams = TrackerRules.ParseInt(ProteinGrams, "Protein"),
         MobilityDone = MobilityDone,
+        Jublia = Jublia,
         Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(),
     };
 

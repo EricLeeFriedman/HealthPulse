@@ -237,6 +237,16 @@
             </Border>
 
             <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Daily" Style="{StaticResource CardTitle}" />
+                    <Grid ColumnDefinitions="Auto,*">
+                        <CheckBox IsChecked="{Binding Jublia}" Color="#0F766E" />
+                        <Label Grid.Column="1" Text="Applied Jublia" VerticalOptions="Center" FontSize="15" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="6">
                     <Grid ColumnDefinitions="Auto,*,Auto">
                         <CheckBox IsChecked="{Binding MobilityDone}" Color="#0F766E" />

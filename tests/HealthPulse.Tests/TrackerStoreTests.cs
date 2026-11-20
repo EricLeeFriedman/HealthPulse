@@ -32,7 +32,7 @@ public sealed class TrackerStoreTests : IAsyncLifetime
         {
             Date = "2026-11-17", CaffeineCups = 3, LastCaffeineTime = new TimeSpan(12, 15, 0),
             WaterGlasses = 6, FirstMealTime = new TimeSpan(12, 0, 0), AlcoholDrinks = 1, Stress = 3,
-            Riboflavin = true, BComplex = true, CoQ10 = true, Magnesium = true, ProteinGrams = 110, MobilityDone = true
+            Riboflavin = true, BComplex = true, CoQ10 = true, Magnesium = true, ProteinGrams = 110, MobilityDone = true, Jublia = true
         });
 
         var saved = await store.GetCheckInAsync(day);
@@ -42,6 +42,7 @@ public sealed class TrackerStoreTests : IAsyncLifetime
         Assert.Equal(3, saved.Stress);
         Assert.True(saved.AllSupplementsTaken);
         Assert.Equal(110, saved.ProteinGrams);
+        Assert.True(saved.Jublia);
         Assert.NotEqual(DateTime.MinValue, saved.UpdatedAt);
 
         // Saving the same day again replaces it.

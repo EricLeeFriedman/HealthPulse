@@ -13,6 +13,7 @@ public class DailyRemindersTests
     {
         Date = DailyCheckIn.Key(date),
         Riboflavin = true, BComplex = true, CoQ10 = true, Magnesium = true,
+        Jublia = true,
         ProteinGrams = 130,
         UpdatedAt = DateTime.UtcNow,
     };
@@ -34,9 +35,10 @@ public class DailyRemindersTests
     {
         var tasks = DailyReminders.OpenTasks(Monday, new DailyCheckIn { UpdatedAt = DateTime.MinValue }, [], null);
 
-        Assert.Equal(new[] { "preventives", "workout", "checkin", "measure" }, tasks.Select(t => t.Key));
+        Assert.Equal(new[] { "preventives", "jublia", "workout", "checkin", "measure" }, tasks.Select(t => t.Key));
         Assert.Contains("riboflavin, B complex, CoQ10, magnesium", tasks[0].Text);
-        Assert.Equal("Do today's workout: Strength A", tasks[1].Text);
+        Assert.Equal("Apply Jublia", tasks[1].Text);
+        Assert.Equal("Do today's workout: Strength A", tasks[2].Text);
     }
 
     [Fact]
@@ -53,6 +55,21 @@ public class DailyRemindersTests
         checkIn.CoQ10 = false;
         var task = Assert.Single(DailyReminders.OpenTasks(Monday, checkIn, [Workout(Monday, WorkoutPlan.StrengthA)], Monday));
         Assert.Equal("Take preventives (CoQ10)", task.Text);
+    }
+
+    [Fact]
+    public void Jublia_IsItsOwnTask_NotPartOfPreventives()
+    {
+        var checkIn = Done(Saturday);
+        checkIn.Jublia = false;
+        var task = Assert.Single(DailyReminders.OpenTasks(Saturday, checkIn, [], Saturday));
+        Assert.Equal("jublia", task.Key);
+        Assert.Equal("Apply Jublia", task.Text);
+        Assert.True(checkIn.AllSupplementsTaken);
+
+        checkIn.Jublia = true;
+        checkIn.Magnesium = false;
+        Assert.Equal("Take preventives (magnesium)", Assert.Single(DailyReminders.OpenTasks(Saturday, checkIn, [], Saturday)).Text);
     }
 
     [Fact]
