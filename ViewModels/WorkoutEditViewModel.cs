@@ -136,7 +136,7 @@ public partial class WorkoutEditViewModel : ObservableObject, IQueryAttributable
     [ObservableProperty] public partial bool IsDetected { get; set; }
     [ObservableProperty] public partial ObservableCollection<ExerciseLog> Exercises { get; set; } = [];
 
-    public string MobilityText => string.Join("\n", WorkoutPlan.MobilityRoutine.Select((m, i) => $"{i + 1}. {m}"));
+    public List<MobilityMoveItem> MobilityMoves { get; } = MobilityMoveItem.All();
 
     string SelectedType => TypeIndex >= 0 && TypeIndex < SessionTypes.Count ? SessionTypes[TypeIndex] : "";
 
