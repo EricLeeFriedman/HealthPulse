@@ -14,6 +14,20 @@ public class WorkoutPlanTests
         Assert.StartsWith($"{WorkoutPlan.MobilityRoutine.Length}. ", lines[^1]);
     }
 
+    [Fact]
+    public void MobilityMoves_EachHaveHowToAndHttpsDemoLink()
+    {
+        Assert.Equal(7, WorkoutPlan.MobilityMoves.Length);
+        Assert.Equal(WorkoutPlan.MobilityMoves.Select(m => m.Step), WorkoutPlan.MobilityRoutine);
+        foreach (var move in WorkoutPlan.MobilityMoves)
+        {
+            Assert.True(move.How.Length > 80, $"{move.Name} needs a real how-to");
+            Assert.StartsWith("https://", move.DemoUrl);
+            Assert.True(Uri.IsWellFormedUriString(move.DemoUrl, UriKind.Absolute), move.DemoUrl);
+            Assert.False(string.IsNullOrWhiteSpace(move.DemoSource));
+        }
+    }
+
     [Theory]
     [InlineData(DayOfWeek.Monday, "Strength A")]
     [InlineData(DayOfWeek.Tuesday, "Run")]
