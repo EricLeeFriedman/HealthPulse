@@ -12,6 +12,12 @@ public record ExerciseTemplate(string Name, bool Weighted, bool Timed = false, b
 }
 
 /// <summary>This week's progress against the plan's six sessions.</summary>
+/// <summary>One move of the mobility routine, with how to do it and where to see it.</summary>
+public record MobilityMove(string Name, string Dose, string How, string DemoUrl, string DemoSource)
+{
+    public string Step => $"{Name}, {Dose}";
+}
+
 public record WeekProgress(DateOnly WeekStart, int StrengthDone, int RunsDone, bool MobilityDone)
 {
     public const int StrengthPlanned = 3;
@@ -41,16 +47,37 @@ public static class WorkoutPlan
 
     public static readonly string[] SessionTypes = [StrengthA, StrengthB, StrengthC, Run, Mobility, Other];
 
-    public static readonly string[] MobilityRoutine =
+    /// <summary>
+    /// The mobility routine, each move with a plain-language how-to and a link to a
+    /// reputable page with photos of the move. Links checked Nov 2026.
+    /// </summary>
+    public static readonly MobilityMove[] MobilityMoves =
     [
-        "Child's pose, 1 min",
-        "Half-kneeling hip flexor stretch, 45 s per side",
-        "Lying hamstring stretch with a towel, 45 s per side",
-        "90/90 hip switches, 8 per side",
-        "Open-book thoracic rotation, 8 per side",
-        "Deep squat hold, 3 x 20 s",
-        "Figure-4 glute stretch, 45 s per side"
+        new("Child's pose", "1 min",
+            "Kneel on the floor with your big toes touching and your knees about hip-width apart or wider. Sit your hips back toward your heels and walk your hands forward until your forehead rests on the floor or a pillow. Let your chest sink and breathe slowly.",
+            "https://www.acefitness.org/resources/everyone/exercise-library/227/childs-pose/", "ACE"),
+        new("Half-kneeling hip flexor stretch", "45 s per side",
+            "Kneel on your right knee (put a pillow under it) with your left foot flat in front, both knees bent about 90 degrees. Squeeze your right glute, tuck your tailbone a little, then shift your hips forward until you feel a stretch in the front of your right hip. Keep your chest tall and don't arch your lower back. Switch sides.",
+            "https://www.acefitness.org/resources/everyone/exercise-library/142/kneeling-hip-flexor-stretch/", "ACE"),
+        new("Lying hamstring stretch with a towel", "45 s per side",
+            "Lie on your back with your legs straight. Loop a towel around the ball of one foot and hold both ends. Keeping that knee almost straight, pull the leg up until you feel a stretch behind your thigh, not behind your knee. Keep the other leg flat on the floor. No towel? Rest your heel up a door frame, as in the photo.",
+            "https://www.acefitness.org/resources/everyone/exercise-library/235/supine-hamstrings-stretch/", "ACE"),
+        new("90/90 hip switches", "8 per side",
+            "Sit on the floor with your knees bent, feet flat and wider than your hips, hands on the floor behind you. Let both knees drop to the right so your right shin lies in front of you and your left shin out to the side, both knees bent about 90 degrees. Sit tall for a breath, then lift your knees and let them drop to the left. Move slowly and lean on your hands as much as you need.",
+            "https://health.clevelandclinic.org/90-90-stretch/", "Cleveland Clinic"),
+        new("Open-book thoracic rotation", "8 per side",
+            "Lie on your left side with your knees bent up to hip height and stacked, arms straight out in front, palms together. Keep your knees together and sweep your top arm up and over to the other side like opening a book, turning your chest and head to follow it as far as is comfortable. Breathe out, then bring it back. Do all 8, then switch sides.",
+            "https://us.humankinetics.com/blogs/excerpt/try-this-exercise-opening-a-book", "Human Kinetics"),
+        new("Deep squat hold", "3 x 20 s",
+            "Stand with your feet a little wider than your shoulders, toes turned out. Sit your hips straight down between your heels as low as is comfortable, chest up, elbows pressing gently on your inner knees. Hold 20 seconds, stand up, and repeat 3 times. Tipping backward? Hold a door frame or counter, or put a folded towel under your heels.",
+            "https://www.hingehealth.com/resources/articles/benefits-of-deep-squat/", "Hinge Health"),
+        new("Figure-4 glute stretch", "45 s per side",
+            "Lie on your back with your knees bent and feet flat. Cross your right ankle over your left knee. Reach through and hold the back of your left thigh, then pull it toward your chest until you feel a stretch in your right buttock. Keep your head and shoulders relaxed on the floor. Switch sides.",
+            "https://www.hingehealth.com/resources/articles/figure-four/", "Hinge Health"),
     ];
+
+    /// <summary>Each move with its dose, such as "Child's pose, 1 min".</summary>
+    public static readonly string[] MobilityRoutine = MobilityMoves.Select(m => m.Step).ToArray();
 
     /// <summary>The routine as numbered steps, for the Today tab.</summary>
     public static string MobilityRoutineText =>

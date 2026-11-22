@@ -307,7 +307,8 @@ public partial class TodayViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(MobilityButtonText))]
     public partial bool ShowMobilityRoutine { get; set; }
     public string MobilityButtonText => ShowMobilityRoutine ? "Hide" : "ⓘ Steps";
-    public string MobilityRoutineText { get; } = WorkoutPlan.MobilityRoutineText;
+    public string MobilityIntro => "About 15 minutes, same routine every time. Move slowly and stay below pain. Tap a move to see how.";
+    public List<MobilityMoveItem> MobilityMoves { get; } = MobilityMoveItem.All();
 
     [RelayCommand]
     void ToggleMobilityRoutine() => ShowMobilityRoutine = !ShowMobilityRoutine;
