@@ -118,37 +118,43 @@
                     <Editor Text="{Binding NewFoodText}" Placeholder="What did you eat? e.g. 3 eggs, 1 slice toast, big latte" AutoSize="TextChanges" MaxLength="500" />
                     <Label Text="No exact amounts? Pick a rough portion, tick what's in it, or add a photo. It all goes in the export." Style="{StaticResource Muted}" />
                     <Picker Title="Portion (optional)" ItemsSource="{Binding PortionChoices}" SelectedItem="{Binding NewFoodPortion}" />
-                    <Label Text="What's in it (tap all that apply)" Style="{StaticResource Muted}" />
-                    <FlexLayout Wrap="Wrap" JustifyContent="Start" BindableLayout.ItemsSource="{Binding IngredientChips}">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="vm:IngredientChip">
-                                <Button Text="{Binding Text}" Margin="0,0,6,6"
-                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:TodayViewModel}}, Path=ToggleIngredientCommand, x:DataType=vm:TodayViewModel}"
-                                        CommandParameter="{Binding .}">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-                                            <Setter Property="HeightRequest" Value="38" />
-                                            <Setter Property="Padding" Value="12,0" />
-                                            <Setter Property="FontSize" Value="13" />
-                                            <Setter Property="BackgroundColor" Value="#F3F4F6" />
-                                            <Setter Property="TextColor" Value="#374151" />
-                                            <Style.Triggers>
-                                                <DataTrigger TargetType="Button" Binding="{Binding IsSelected}" Value="True">
-                                                    <Setter Property="BackgroundColor" Value="#0F766E" />
-                                                    <Setter Property="TextColor" Value="White" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
-                    </FlexLayout>
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                        <Entry Text="{Binding CustomIngredient}" Placeholder="Something else, e.g. ham" MaxLength="40"
-                               ReturnCommand="{Binding AddCustomIngredientCommand}" />
-                        <Button Grid.Column="1" Text="+ Add" Style="{StaticResource SecondaryButton}" Command="{Binding AddCustomIngredientCommand}" />
-                    </Grid>
+                    <Label Text="{Binding IngredientsHeaderText}" FontSize="14" TextColor="#0F766E" Padding="0,6">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding ToggleIngredientsCommand}" />
+                        </Label.GestureRecognizers>
+                    </Label>
+                    <VerticalStackLayout Spacing="8" IsVisible="{Binding ShowIngredients}">
+                        <FlexLayout Wrap="Wrap" JustifyContent="Start" BindableLayout.ItemsSource="{Binding IngredientChips}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:IngredientChip">
+                                    <Button Text="{Binding Text}" Margin="0,0,6,6" FlexLayout.Shrink="0" LineBreakMode="NoWrap"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:TodayViewModel}}, Path=ToggleIngredientCommand, x:DataType=vm:TodayViewModel}"
+                                            CommandParameter="{Binding .}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                                <Setter Property="HeightRequest" Value="38" />
+                                                <Setter Property="Padding" Value="12,0" />
+                                                <Setter Property="FontSize" Value="13" />
+                                                <Setter Property="BackgroundColor" Value="#F3F4F6" />
+                                                <Setter Property="TextColor" Value="#374151" />
+                                                <Style.Triggers>
+                                                    <DataTrigger TargetType="Button" Binding="{Binding IsSelected}" Value="True">
+                                                        <Setter Property="BackgroundColor" Value="#0F766E" />
+                                                        <Setter Property="TextColor" Value="White" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </FlexLayout>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Entry Text="{Binding CustomIngredient}" Placeholder="Something else, e.g. ham" MaxLength="40"
+                                   ReturnCommand="{Binding AddCustomIngredientCommand}" />
+                            <Button Grid.Column="1" Text="+ Add" Style="{StaticResource SecondaryButton}" Command="{Binding AddCustomIngredientCommand}" />
+                        </Grid>
+                    </VerticalStackLayout>
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                         <Button Text="📷  Photo" Style="{StaticResource SecondaryButton}" Command="{Binding TakeFoodPhotoCommand}" />
                         <Button Grid.Column="1" Text="🖼  Choose" Style="{StaticResource SecondaryButton}" Command="{Binding ChooseFoodPhotoCommand}" />
