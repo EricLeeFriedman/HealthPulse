@@ -25,6 +25,15 @@ public sealed class MealDetailsTests : IAsyncLifetime
     static readonly DateTime Lunch = new(2026, 11, 20, 12, 30, 0);
 
     [Fact]
+    public void IngredientsHeader_ShowsStateAndTickedCount()
+    {
+        Assert.Equal("▸ What's in it (optional)", FoodLog.IngredientsHeader(false, 0));
+        Assert.Equal("▾ What's in it (tap all that apply)", FoodLog.IngredientsHeader(true, 0));
+        Assert.Equal("▸ What's in it (2 ticked)", FoodLog.IngredientsHeader(false, 2));
+        Assert.Equal("▾ What's in it (1 ticked)", FoodLog.IngredientsHeader(true, 1));
+    }
+
+    [Fact]
     public void Validate_AcceptsKnownPortionsAndRejectsOthers()
     {
         FoodLog.Validate(new FoodEntry { Text = "minestrone", Portion = "Large bowl", Ingredients = "Beans|Pasta" });

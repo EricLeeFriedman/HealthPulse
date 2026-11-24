@@ -344,6 +344,15 @@ public partial class TodayViewModel : ObservableObject
     [ObservableProperty] public partial ObservableCollection<IngredientChip> IngredientChips { get; set; } = [];
     [ObservableProperty] public partial string CustomIngredient { get; set; } = "";
 
+    /// <summary>The ingredient chips are tucked away by default; tap the header to show them.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IngredientsHeaderText))]
+    public partial bool ShowIngredients { get; set; }
+    public string IngredientsHeaderText => FoodLog.IngredientsHeader(ShowIngredients, IngredientChips.Count(c => c.IsSelected));
+
+    [RelayCommand]
+    void ToggleIngredients() => ShowIngredients = !ShowIngredients;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasNewFoodPhoto), nameof(NewFoodPhoto))]
     public partial string? NewFoodPhotoPath { get; set; }
@@ -358,6 +367,7 @@ public partial class TodayViewModel : ObservableObject
         foreach (var chip in IngredientChips) chip.IsSelected = wanted.Remove(chip.Name);
         // Ingredients not among the chips (older custom ones) get a chip of their own.
         foreach (var name in wanted) IngredientChips.Add(new IngredientChip(name, true));
+        OnPropertyChanged(nameof(IngredientsHeaderText));
     }
 
     void ResetFoodDetails()
@@ -372,6 +382,7 @@ public partial class TodayViewModel : ObservableObject
     void ToggleIngredient(IngredientChip? chip)
     {
         if (chip != null) chip.IsSelected = !chip.IsSelected;
+        OnPropertyChanged(nameof(IngredientsHeaderText));
     }
 
     [RelayCommand]
@@ -384,6 +395,7 @@ public partial class TodayViewModel : ObservableObject
         if (chip == null) IngredientChips.Add(new IngredientChip(name, true));
         else chip.IsSelected = true;
         CustomIngredient = "";
+        OnPropertyChanged(nameof(IngredientsHeaderText));
     }
 
     public static string MealPhotoFolder => Path.Combine(FileSystem.AppDataDirectory, FoodLog.PhotoFolderName);

@@ -78,6 +78,14 @@ public static class FoodLog
         return [.. CommonIngredients, .. custom];
     }
 
+    /// <summary>
+    /// The header of the collapsible ingredient section, e.g. "▸ What's in it (2 ticked)", so ticked
+    /// ingredients (from a frequent food or an entry being edited) are visible while it's collapsed.
+    /// </summary>
+    public static string IngredientsHeader(bool expanded, int selectedCount) =>
+        (expanded ? "▾ " : "▸ ") + "What's in it" +
+        (selectedCount > 0 ? $" ({selectedCount} ticked)" : expanded ? " (tap all that apply)" : " (optional)");
+
     /// <summary>The Drive file name for a meal photo, e.g. "meal-2026-11-20-1230-1a2b3c4d.jpg".</summary>
     public static string PhotoName(FoodEntry entry, string extension)
     {
