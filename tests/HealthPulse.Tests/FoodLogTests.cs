@@ -111,4 +111,96 @@ public sealed class FoodLogTests : IAsyncLifetime
         Assert.False(meals[1].TryGetProperty("proteinGrams", out _));
         Assert.Equal(20, days[1].GetProperty("mealProteinGrams").GetInt32());
     }
+
+    [Fact]
+    public void Count_DefaultsToOneAndScalesProteinAndDisplay()
+    {
+        var old = new FoodEntry { Text = "clementine", ProteinGrams = 1 };
+        Assert.Null(old.Quantity);
+        Assert.Equal(1, old.Count);
+        Assert.Equal("clementine  •  1 g protein", old.Display);
+
+        var two = new FoodEntry { Text = "Chobani 6.7 oz", ProteinGrams = 16, Count = 2 };
+        Assert.Equal(32, two.TotalProteinGrams);
+        Assert.Equal("2 × Chobani 6.7 oz  •  32 g protein", two.Display);
+        Assert.Equal(1 + 32, FoodLog.ProteinTotal([old, two]));
+
+        // A stored 0 (or anything below 1) reads as 1.
+        Assert.Equal(1, new FoodEntry { Text = "apple", Quantity = 0 }.Count);
+    }
+
+    [Fact]
+    public void Validate_AndStepCount_KeepCountWithinRange()
+    {
+        FoodLog.Validate(new FoodEntry { Text = "clementine", Count = 2 });
+        FoodLog.Validate(new FoodEntry { Text = "clementine" });
+        Assert.Throws<ArgumentException>(() => FoodLog.Validate(new FoodEntry { Text = "clementine", Count = 0 }));
+        Assert.Throws<ArgumentException>(() => FoodLog.Validate(new FoodEntry { Text = "clementine", Count = FoodLog.MaxCount + 1 }));
+
+        Assert.Equal(2, FoodLog.StepCount(1, 1));
+        Assert.Equal(1, FoodLog.StepCount(1, -1));
+        Assert.Equal(FoodLog.MaxCount, FoodLog.StepCount(FoodLog.MaxCount, 1));
+    }
+
+    [Fact]
+    public void ApplyTo_ScalesProteinByCount()
+    {
+        var checkIn = new DailyCheckIn { Date = "2026-11-25" };
+        FoodLog.ApplyTo(checkIn,
+        [
+            new FoodEntry { Time = new DateTime(2026, 11, 25, 9, 0, 0), Text = "egg", ProteinGrams = 6, Count = 3 },
+            new FoodEntry { Time = new DateTime(2026, 11, 25, 12, 0, 0), Text = "chicken bowl", ProteinGrams = 40 },
+        ]);
+        Assert.Equal(58, checkIn.ProteinGrams);
+    }
+
+    [Fact]
+    public async Task Store_KeepsCountAndReadsOlderEntriesAsOne()
+    {
+        // A database from before counts existed: the FoodEntry table has no Quantity column.
+        await store.Database.ExecuteAsync(
+            "create table FoodEntry (Id varchar primary key not null, Time bigint, Text varchar, ProteinGrams integer, " +
+            "Portion varchar, Ingredients varchar, PhotoPath varchar, PhotoName varchar, PhotoDriveId varchar, UpdatedAt bigint)");
+        await store.Database.ExecuteAsync(
+            "insert into FoodEntry (Id, Time, Text, Ingredients, UpdatedAt) values (?, ?, ?, '', ?)",
+            "old", new DateTime(2026, 11, 24, 8, 0, 0).Ticks, "clementine", DateTime.UtcNow.Ticks);
+
+        await store.SaveFoodAsync(new FoodEntry { Time = new DateTime(2026, 11, 24, 15, 0, 0), Text = "clementine", Count = 2 });
+
+        var day = await store.GetFoodAsync(new DateOnly(2026, 11, 24), new DateOnly(2026, 11, 24));
+        Assert.Equal(2, day.Count);
+        Assert.Equal(1, day[0].Count);
+        Assert.Equal(2, day[1].Count);
+        Assert.Equal("2 × clementine", day[1].Display);
+
+        day[1].Count = 3;
+        await store.SaveFoodAsync(day[1]);
+        Assert.Equal(3, (await store.GetFoodAsync(new DateOnly(2026, 11, 24), new DateOnly(2026, 11, 24)))[1].Count);
+    }
+
+    [Fact]
+    public void Export_IncludesCountAndScaledProtein()
+    {
+        var trackers = TrackerExport.Empty with
+        {
+            Food =
+            [
+                new FoodEntry { Time = new DateTime(2026, 11, 25, 9, 0, 0), Text = "egg", ProteinGrams = 6, Count = 3 },
+                new FoodEntry { Time = new DateTime(2026, 11, 25, 15, 0, 0), Text = "clementine" },
+            ]
+        };
+
+        var json = HealthExportService.BuildJson(DateTime.UtcNow, "UTC",
+            new DateOnly(2026, 11, 25), new DateOnly(2026, 11, 25), [], [], trackers: trackers);
+
+        using var doc = JsonDocument.Parse(json);
+        var day = doc.RootElement.GetProperty("days")[0];
+        var meals = day.GetProperty("meals");
+        Assert.Equal(3, meals[0].GetProperty("count").GetInt32());
+        Assert.Equal(18, meals[0].GetProperty("proteinGrams").GetInt32());
+        Assert.Equal(6, meals[0].GetProperty("proteinGramsEach").GetInt32());
+        Assert.Equal(1, meals[1].GetProperty("count").GetInt32());
+        Assert.False(meals[1].TryGetProperty("proteinGramsEach", out _));
+        Assert.Equal(18, day.GetProperty("mealProteinGrams").GetInt32());
+    }
 }

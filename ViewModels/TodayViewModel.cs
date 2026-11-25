@@ -318,6 +318,36 @@ public partial class TodayViewModel : ObservableObject
     [ObservableProperty] public partial TimeSpan NewFoodTime { get; set; } = DateTime.Now.TimeOfDay;
     [ObservableProperty] public partial string MealsSummary { get; set; } = "";
 
+    /// <summary>How many of the food being added, e.g. 2 clementines. Starts at 1.</summary>
+    [ObservableProperty] public partial int NewFoodCount { get; set; } = 1;
+
+    [RelayCommand]
+    void IncreaseNewFoodCount() => NewFoodCount = FoodLog.StepCount(NewFoodCount, 1);
+
+    [RelayCommand]
+    void DecreaseNewFoodCount() => NewFoodCount = FoodLog.StepCount(NewFoodCount, -1);
+
+    /// <summary>The + on a logged entry: one more of it, saved right away.</summary>
+    [RelayCommand]
+    Task IncreaseFoodCountAsync(FoodEntry? entry) => ChangeFoodCountAsync(entry, 1);
+
+    /// <summary>The − on a logged entry: one fewer (never below 1), saved right away.</summary>
+    [RelayCommand]
+    Task DecreaseFoodCountAsync(FoodEntry? entry) => ChangeFoodCountAsync(entry, -1);
+
+    Task ChangeFoodCountAsync(FoodEntry? entry, int step) => UiActions.RunAsync(Errors, "Changing how many", async () =>
+    {
+        if (entry == null) return;
+        var count = FoodLog.StepCount(entry.Count, step);
+        if (count == entry.Count) return;
+        entry.Count = count;
+        await Store.SaveFoodAsync(entry);
+        // Keep the editor in step when this entry is the one open in it.
+        if (EditingFood?.Id == entry.Id) NewFoodCount = count;
+        await LoadMealsAsync(DateOnly.FromDateTime(Date));
+        await ApplyMealsAsync();
+    });
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEditingFood), nameof(FoodButtonText))]
     public partial FoodEntry? EditingFood { get; set; }
@@ -372,6 +402,7 @@ public partial class TodayViewModel : ObservableObject
 
     void ResetFoodDetails()
     {
+        NewFoodCount = 1;
         NewFoodPortion = FoodLog.NoPortion;
         CustomIngredient = "";
         NewFoodPhotoPath = null;
@@ -477,6 +508,14 @@ public partial class TodayViewModel : ObservableObject
     void PickFrequentFood(FrequentFood? food)
     {
         if (food == null) return;
+        // Tapping the same quick pick again before adding it means one more, e.g. a second clementine.
+        if (EditingFood == null && pickedFood != null
+            && FrequentFoods.Key(food.Text) == FrequentFoods.Key(pickedFood.Text)
+            && FrequentFoods.Key(NewFoodText) == FrequentFoods.Key(food.Text))
+        {
+            NewFoodCount = FoodLog.StepCount(NewFoodCount, 1);
+            return;
+        }
         DiscardUnsavedPhoto();
         EditingFood = null;
         NewFoodText = food.Text;
@@ -485,6 +524,7 @@ public partial class TodayViewModel : ObservableObject
         // Same food, same usual portion and ingredients; a photo is of this meal only, so it starts empty.
         NewFoodPhotoPath = null;
         CustomIngredient = "";
+        NewFoodCount = 1;
         NewFoodPortion = FoodLog.ChoiceFor(food.Portion);
         SetIngredients(food.Ingredients);
     }
@@ -687,6 +727,7 @@ public partial class TodayViewModel : ObservableObject
         var oldPhoto = entry.PhotoPath;
         entry.Time = Date.Date + NewFoodTime;
         entry.Text = NewFoodText;
+        entry.Count = FoodLog.StepCount(NewFoodCount, 0);
         entry.Portion = FoodLog.PortionFromChoice(NewFoodPortion);
         entry.IngredientList = SelectedIngredients;
         if (EditingFood == null && pickedFood?.ProteinGrams is { } protein
@@ -724,6 +765,7 @@ public partial class TodayViewModel : ObservableObject
             pickedFood = null;
             NewFoodText = entry.Text;
             NewFoodTime = entry.Time.TimeOfDay;
+            NewFoodCount = entry.Count;
             NewFoodPortion = FoodLog.ChoiceFor(entry.Portion);
             CustomIngredient = "";
             NewFoodPhotoPath = entry.PhotoPath;

@@ -11,6 +11,7 @@ public static class FoodLog
     public const int MaxTextLength = 500;
     public const int MaxIngredients = 20;
     public const int MaxIngredientLength = 40;
+    public const int MaxCount = 99;
     public const string PhotoFolderName = "meal-photos";
 
     /// <summary>
@@ -109,6 +110,7 @@ public static class FoodLog
         if (string.IsNullOrWhiteSpace(entry.Text)) throw new ArgumentException("Describe what you ate.");
         if (entry.Text.Trim().Length > MaxTextLength) throw new ArgumentException($"Keep it under {MaxTextLength} characters.");
         if (entry.ProteinGrams is < 0 or > 300) throw new ArgumentException("Protein must be 0 to 300 g.");
+        if (entry.Quantity is < 1 or > MaxCount) throw new ArgumentException($"How many must be 1 to {MaxCount}.");
         if (!string.IsNullOrWhiteSpace(entry.Portion) && FindPortion(entry.Portion) == null)
             throw new ArgumentException($"Unknown portion \"{entry.Portion}\".");
         var ingredients = entry.IngredientList;
@@ -117,11 +119,14 @@ public static class FoodLog
             throw new ArgumentException($"Keep each ingredient under {MaxIngredientLength} characters.");
     }
 
-    /// <summary>Sum of the meals' protein estimates, or null when none has one.</summary>
+    /// <summary>A count stepped up or down by one, kept within 1 to <see cref="MaxCount"/>.</summary>
+    public static int StepCount(int count, int step) => Math.Clamp(count + step, 1, MaxCount);
+
+    /// <summary>Sum of the meals' protein estimates, each times its count, or null when none has one.</summary>
     public static int? ProteinTotal(IEnumerable<FoodEntry> entries)
     {
         var withProtein = entries.Where(e => e.ProteinGrams.HasValue).ToList();
-        return withProtein.Count == 0 ? null : withProtein.Sum(e => e.ProteinGrams!.Value);
+        return withProtein.Count == 0 ? null : withProtein.Sum(e => e.TotalProteinGrams!.Value);
     }
 
     /// <summary>
