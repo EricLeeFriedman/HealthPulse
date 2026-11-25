@@ -104,7 +104,7 @@
                 <VerticalStackLayout Spacing="8">
                     <Label Text="Food log" Style="{StaticResource CardTitle}" />
                     <VerticalStackLayout Spacing="6" IsVisible="{Binding HasFrequentFoods}">
-                        <Label Text="Frequent foods (tap to fill in, then Add)" Style="{StaticResource Muted}" />
+                        <Label Text="Frequent foods (tap to fill in, tap again for one more, then Add)" Style="{StaticResource Muted}" />
                         <FlexLayout Wrap="Wrap" JustifyContent="Start" BindableLayout.ItemsSource="{Binding FrequentFoodsList}">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate x:DataType="services:FrequentFood">
@@ -116,6 +116,15 @@
                         </FlexLayout>
                     </VerticalStackLayout>
                     <Editor Text="{Binding NewFoodText}" Placeholder="What did you eat? e.g. 3 eggs, 1 slice toast, big latte" AutoSize="TextChanges" MaxLength="500" />
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                        <Label Text="How many" VerticalOptions="Center" />
+                        <Button Grid.Column="1" Text="−" Style="{StaticResource SecondaryButton}" WidthRequest="48"
+                                Command="{Binding DecreaseNewFoodCountCommand}" />
+                        <Label Grid.Column="2" Text="{Binding NewFoodCount}" FontSize="18" FontAttributes="Bold"
+                               MinimumWidthRequest="32" HorizontalTextAlignment="Center" VerticalOptions="Center" />
+                        <Button Grid.Column="3" Text="+" Style="{StaticResource SecondaryButton}" WidthRequest="48"
+                                Command="{Binding IncreaseNewFoodCountCommand}" />
+                    </Grid>
                     <Label Text="No exact amounts? Pick a rough portion, tick what's in it, or add a photo. It all goes in the export." Style="{StaticResource Muted}" />
                     <Picker Title="Portion (optional)" ItemsSource="{Binding PortionChoices}" SelectedItem="{Binding NewFoodPortion}" />
                     <Label Text="{Binding IngredientsHeaderText}" FontSize="14" TextColor="#0F766E" Padding="0,6">
@@ -175,13 +184,21 @@
                     <VerticalStackLayout Spacing="6" BindableLayout.ItemsSource="{Binding Meals}">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="models:FoodEntry">
-                                <Grid ColumnDefinitions="70,*" ColumnSpacing="8">
+                                <Grid ColumnDefinitions="70,*,Auto,Auto,Auto" ColumnSpacing="6">
                                     <Grid.GestureRecognizers>
                                         <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:TodayViewModel}}, Path=FoodTappedCommand, x:DataType=vm:TodayViewModel}"
                                                               CommandParameter="{Binding .}" />
                                     </Grid.GestureRecognizers>
-                                    <Label Text="{Binding DisplayTime}" FontAttributes="Bold" TextColor="#0F766E" />
-                                    <Label Grid.Column="1" Text="{Binding Display}" TextColor="#374151" />
+                                    <Label Text="{Binding DisplayTime}" FontAttributes="Bold" TextColor="#0F766E" VerticalOptions="Center" />
+                                    <Label Grid.Column="1" Text="{Binding Display}" TextColor="#374151" VerticalOptions="Center" />
+                                    <Button Grid.Column="2" Text="−" Style="{StaticResource SecondaryButton}" WidthRequest="40" HeightRequest="36" Padding="0"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:TodayViewModel}}, Path=DecreaseFoodCountCommand, x:DataType=vm:TodayViewModel}"
+                                            CommandParameter="{Binding .}" />
+                                    <Label Grid.Column="3" Text="{Binding Count}" FontAttributes="Bold" MinimumWidthRequest="20"
+                                           HorizontalTextAlignment="Center" VerticalOptions="Center" />
+                                    <Button Grid.Column="4" Text="+" Style="{StaticResource SecondaryButton}" WidthRequest="40" HeightRequest="36" Padding="0"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:TodayViewModel}}, Path=IncreaseFoodCountCommand, x:DataType=vm:TodayViewModel}"
+                                            CommandParameter="{Binding .}" />
                                 </Grid>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>

@@ -243,8 +243,23 @@ public class FoodEntry
     /// <summary>What was eaten, with rough portions.</summary>
     public string Text { get; set; } = "";
 
-    /// <summary>Optional protein estimate in grams.</summary>
+    /// <summary>Optional protein estimate in grams, for one of <see cref="Count"/>.</summary>
     public int? ProteinGrams { get; set; }
+
+    /// <summary>How many were eaten, e.g. 2 clementines. Null on entries logged before counts existed.</summary>
+    public int? Quantity { get; set; }
+
+    /// <summary>How many were eaten, at least 1; entries without a count count as 1.</summary>
+    [Ignore]
+    public int Count
+    {
+        get => Quantity is > 0 ? Quantity.Value : 1;
+        set => Quantity = value;
+    }
+
+    /// <summary>Protein for the whole entry (the estimate times the count), or null without an estimate.</summary>
+    [Ignore]
+    public int? TotalProteinGrams => ProteinGrams * Count;
 
     /// <summary>Optional rough portion, one of <c>FoodLog.Portions</c> (e.g. "Medium bowl").</summary>
     public string? Portion { get; set; }
@@ -284,10 +299,10 @@ public class FoodEntry
     {
         get
         {
-            var parts = new List<string> { Text };
+            var parts = new List<string> { Count > 1 ? $"{Count} × {Text}" : Text };
             if (!string.IsNullOrWhiteSpace(Portion)) parts.Add(Portion!);
             if (IngredientList.Count > 0) parts.Add(string.Join(", ", IngredientList));
-            if (ProteinGrams.HasValue) parts.Add($"{ProteinGrams} g protein");
+            if (ProteinGrams.HasValue) parts.Add($"{TotalProteinGrams} g protein");
             if (HasPhoto) parts.Add("📷");
             return string.Join("  •  ", parts);
         }

@@ -268,7 +268,9 @@ public class HealthExportService
                         portion = FoodLog.FindPortion(f.Portion)?.Name,
                         portionSize = FoodLog.FindPortion(f.Portion)?.Size,
                         ingredients = f.IngredientList.Count > 0 ? f.IngredientList : null,
-                        proteinGrams = f.ProteinGrams,
+                        count = f.Count,
+                        proteinGrams = f.TotalProteinGrams,
+                        proteinGramsEach = f.Count > 1 ? f.ProteinGrams : null,
                         photo = f.HasPhoto && !string.IsNullOrEmpty(f.PhotoDriveId) ? MealPhotos.ExportPath(f) : null,
                         photoDriveFileId = f.HasPhoto ? f.PhotoDriveId : null,
                         photoPendingUpload = f.HasPhoto && string.IsNullOrEmpty(f.PhotoDriveId) ? true : (bool?)null,
@@ -300,7 +302,7 @@ public class HealthExportService
             healthConnectSteps = healthSteps is { Count: > 0 } ? healthSteps : null,
             weatherError,
             appErrors = appErrors is { Count: > 0 } ? appErrors : null,
-            notes = "Times are local. sleepHours sums sleep sessions that ended on that date (the night before it). Heart rate values are beats per minute. Pressure is sea-level hPa from Open-Meteo for the phone's coarse location; pressureMaxDrop6hHpa is the biggest 6-hour fall ending that day. Progress photos stay on the phone and are only counted here. meals are free-text food entries with rough portions; proteinGrams on a meal is the user's own estimate. A meal can also have a portion picked from a fixed list (portionSize says what it means, e.g. Medium bowl is about 1.5 to 2 cups), ingredients ticked from chips (main ingredients, not a complete list), and a photo: photo is the path relative to this file's folder (My Drive/HealthPulse/meal-photos/...), and photoDriveFileId is its Google Drive file id. photoPendingUpload means a photo was taken but goes up with the next export. Use the photo, portion and ingredients together with the text to estimate nutrients. Workout sets have rir (reps in reserve, 0 to 3 where 3 means 3 or more) when rated; weights are per dumbbell. strength summarizes each exercise's progression (weight, estimated one-rep max, volume) and the app's next recommendation; strength.rule explains the rule.",
+            notes = "Times are local. sleepHours sums sleep sessions that ended on that date (the night before it). Heart rate values are beats per minute. Pressure is sea-level hPa from Open-Meteo for the phone's coarse location; pressureMaxDrop6hHpa is the biggest 6-hour fall ending that day. Progress photos stay on the phone and are only counted here. meals are free-text food entries with rough portions; count is how many of the item were eaten (1 unless more were logged), so the text describes one and nutrients scale by count. proteinGrams on a meal is the user's own estimate for the whole entry (proteinGramsEach is the estimate for one when count is more than 1). A meal can also have a portion picked from a fixed list (portionSize says what it means, e.g. Medium bowl is about 1.5 to 2 cups), ingredients ticked from chips (main ingredients, not a complete list), and a photo: photo is the path relative to this file's folder (My Drive/HealthPulse/meal-photos/...), and photoDriveFileId is its Google Drive file id. photoPendingUpload means a photo was taken but goes up with the next export. Use the photo, portion and ingredients together with the text to estimate nutrients. Workout sets have rir (reps in reserve, 0 to 3 where 3 means 3 or more) when rated; weights are per dumbbell. strength summarizes each exercise's progression (weight, estimated one-rep max, volume) and the app's next recommendation; strength.rule explains the rule.",
             plan = new
             {
                 start = WorkoutPlan.PlanStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
